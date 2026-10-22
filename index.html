@@ -341,6 +341,7 @@ async function loadMoviePoster(movie) {
 }
 
 
+
 async function fetchTeluguMovies(startYear, requestedCount) {
   const currentYear = new Date().getFullYear();
   const allMovies = [];
@@ -389,13 +390,42 @@ async function fetchTeluguMovies(startYear, requestedCount) {
       if (!year || year < startYear || year > currentYear) continue;
 
       seenIds.add(item.id);
+
+      let hero = "";
+      let heroine = "";
+      let director = "";
+
+      try {
+        const detailsUrl = new URL(
+          `https://api.themoviedb.org/3/movie/${item.id}`
+        );
+        detailsUrl.searchParams.set("api_key", TMDB_API_KEY);
+        detailsUrl.searchParams.set("append_to_response", "credits");
+
+        const detailsResponse = await fetch(detailsUrl);
+
+        if (detailsResponse.ok) {
+          const details = await detailsResponse.json();
+          const cast = details.credits?.cast || [];
+          const crew = details.credits?.crew || [];
+
+          hero = cast[0]?.name || "";
+          heroine = cast[1]?.name || "";
+          director = crew.find(person =>
+            person.job === "Director"
+          )?.name || "";
+        }
+      } catch (error) {
+        console.warn("Could not load movie credits:", item.title);
+      }
+
       allMovies.push({
         tmdbId: item.id,
         name: item.title,
         year,
-        hero: "",
-        heroine: "",
-        director: "",
+        hero,
+        heroine,
+        director,
         tags: []
       });
 
@@ -440,24 +470,71 @@ auth.onAuthStateChanged(u=>{if(u){user=u;$("connection").textContent="Connected 
 $("selectionMode").addEventListener("change",()=>show("manualOptions",$("selectionMode").value==="manual"));
 function screen(name){show("home",name==="home");show("lobby",name==="lobby");show("game",name==="game");}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function prepareQueue(){
- const count=Number($("movieCount").value),budget=Number($("startingBudget").value);
- if(!Number.isInteger(count)||count<1||count>movies.length)throw Error("Choose 1 to "+movies.length+" movies.");
- if(!Number.isSafeInteger(budget)||budget<1)throw Error("Starting budget must be a positive whole number.");
- let pool=[...movies],description="Random Telugu movies";
- if($("selectionMode").value==="manual"){
-  const type=$("personType").value,name=$("personName").value.trim();
-  if(!name)throw Error("Enter a hero, heroine or director name.");
-  pool=pool.filter(m=>m[type].toLowerCase().includes(name.toLowerCase()));
-  description="Filtered by "+type+": "+name;
- }
- if(pool.length<count)throw Error("Only "+pool.length+" matching movies. Choose fewer movies or another name.");
- return {budget,count,description,queue:shuffle(pool).slice(0,count)};
+
+async function prepareQueue() {
+  const count = Number($("movieCount").value);
+  const budget = Number($("startingBudget").value);
+  const startYear = Number($("movieStartYear").value);
+
+  if (!Number.isInteger(count) || count < 1) {
+    throw Error("Choose at least 1 movie.");
+  }
+
+  if (!Number.isSafeInteger(budget) || budget < 1) {
+    throw Error("Starting budget must be a positive whole number.");
+  }
+
+  if (!Number.isInteger(startYear) || startYear < 1900) {
+    throw Error("Please choose a valid starting year.");
+  }
+
+  let pool = await fetchTeluguMovies(startYear, count);
+  let description = "Telugu movies from " + startYear + " onwards";
+
+  if ($("selectionMode").value === "manual") {
+    const type = $("personType").value;
+    const name = $("personName").value.trim();
+
+    if (!name) {
+      throw Error("Enter a hero, heroine or director name.");
+    }
+
+    pool = pool.filter(movie =>
+      String(movie[type] || "")
+        .toLowerCase()
+        .includes(name.toLowerCase())
+    );
+
+    description += " · Filtered by " + type + ": " + name;
+  }
+
+  if (pool.length < count) {
+    throw Error(
+      "Only " + pool.length +
+      " matching movies found. Choose fewer movies or another name."
+    );
+  }
+
+  return {
+    budget,
+    count,
+    description,
+    queue: shuffle(pool).slice(0, count)
+  };
 }
+
 async function createRoom(){
  if(!user)return say("Wait for Firebase to connect.");
  const name=$("playerName").value.trim().slice(0,20);if(!name){tone("error");return say("Please enter your name.");}
- let setup;try{setup=prepareQueue();}catch(e){tone("error");return say(e.message);}
+ 
+let setup;
+try {
+  setup = await prepareQueue();
+} catch (e) {
+  tone("error");
+  return say(e.message);
+}
+
  roomCode=Math.random().toString(36).slice(2,8).toUpperCase();roomRef=db.ref("rooms/"+roomCode);
  const data={hostUid:user.uid,status:"lobby",startingBudget:setup.budget,movieCount:setup.count,selectionDescription:setup.description,movieQueue:setup.queue,round:0,players:{[user.uid]:{name,budget:setup.budget,score:0,bid:0,passed:false,moviesWon:0,moviesWonList:[]}}};
  try{await roomRef.set(data);listenRoom();say("Room created! Share the code with friends.");}
