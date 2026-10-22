@@ -65,7 +65,7 @@ footer{text-align:center;color:#8993b2;font-size:12px;padding:10px 16px 30px}
 <input id="playerName" maxlength="20" placeholder="Enter your name">
 <div class="two">
 <div><label for="startingBudget">Starting budget</label><input id="startingBudget" type="number" min="1" value="1000"></div>
-<div><label for="movieCount">Number of movies</label><input id="movieCount" type="number" min="1" max="41" value="7"></div>
+<div><label for="movieCount">Number of movies</label><input id="movieCount" type="number" min="1" value="7"></div>
 </div>
 <label for="selectionMode">Movie selection</label>
 <select id="selectionMode">
@@ -323,6 +323,78 @@ async function loadMoviePoster(movie) {
   }
 }
 
+async function fetchTeluguMovies(startYear, requestedCount) {
+  const currentYear = new Date().getFullYear();
+  const allMovies = [];
+  const seenIds = new Set();
+  let totalPages = 1;
+
+  for (
+    let page = 1;
+    page <= totalPages &&
+    page <= 500 &&
+    allMovies.length < requestedCount;
+    page++
+  ) {
+    const url = new URL(
+      "https://api.themoviedb.org/3/discover/movie"
+    );
+
+    url.searchParams.set("api_key", TMDB_API_KEY);
+    url.searchParams.set("with_original_language", "te");
+    url.searchParams.set(
+      "primary_release_date.gte",
+      `${startYear}-01-01`
+    );
+    url.searchParams.set(
+      "primary_release_date.lte",
+      `${currentYear}-12-31`
+    );
+    url.searchParams.set("sort_by", "popularity.desc");
+    url.searchParams.set("include_adult", "false");
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("TMDB could not load movies. Please try again.");
+    }
+
+    const data = await response.json();
+    totalPages = Math.min(data.total_pages || 1, 500);
+
+    for (const item of data.results || []) {
+      if (!item.id || seenIds.has(item.id)) continue;
+
+      const year = Number(item.release_date?.slice(0, 4));
+
+      if (!year || year < startYear || year > currentYear) continue;
+
+      seenIds.add(item.id);
+      allMovies.push({
+        tmdbId: item.id,
+        name: item.title,
+        year,
+        hero: "",
+        heroine: "",
+        director: "",
+        tags: []
+      });
+
+      if (allMovies.length >= requestedCount) break;
+    }
+  }
+
+  if (allMovies.length < requestedCount) {
+    throw new Error(
+      "Only " + allMovies.length +
+      " matching Telugu movies were found. Please choose a smaller number."
+    );
+  }
+
+  return allMovies;
+}
+
 
  
 let user=null,roomCode="",roomRef=null,roomData=null,listener=null,advanceTimer=null,resolving=false,audioCtx=null,lastSoundResult="";
@@ -350,26 +422,63 @@ auth.onAuthStateChanged(u=>{if(u){user=u;$("connection").textContent="Connected 
 $("selectionMode").addEventListener("change",()=>show("manualOptions",$("selectionMode").value==="manual"));
 function screen(name){show("home",name==="home");show("lobby",name==="lobby");show("game",name==="game");}
 function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function prepareQueue(){
- const count=Number($("movieCount").value),budget=Number($("startingBudget").value);
- if(!Number.isInteger(count)||count<1||count>movies.length)throw Error("Choose 1 to "+movies.length+" movies.");
- if(!Number.isSafeInteger(budget)||budget<1)throw Error("Starting budget must be a positive whole number.");
- let pool=[...movies],description="Random Telugu movies";
- if($("selectionMode").value==="manual"){
-  const type=$("personType").value,name=$("personName").value.trim();
-  if(!name)throw Error("Enter a hero, heroine or director name.");
-  pool=pool.filter(m=>m[type].toLowerCase().includes(name.toLowerCase()));
-  description="Filtered by "+type+": "+name;
- }
- if(pool.length<count)throw Error("Only "+pool.length+" matching movies. Choose fewer movies or another name.");
- return {budget,count,description,queue:shuffle(pool).slice(0,count)};
+
+async function prepareQueue() {
+  const count = Number($("movieCount").value);
+  const budget = Number($("startingBudget").value);
+  const startYear = Number($("movieStartYear").value);
+
+  if (!Number.isInteger(count) || count < 1) {
+    throw Error("Choose at least 1 movie.");
+  }
+
+  if (!Number.isSafeInteger(budget) || budget < 1) {
+    throw Error("Starting budget must be a positive whole number.");
+  }
+
+  if (
+    !Number.isInteger(startYear) ||
+    startYear < 1980 ||
+    startYear > new Date().getFullYear()
+  ) {
+    throw Error("Please choose a valid starting year.");
+  }
+
+  if ($("selectionMode").value === "manual") {
+    throw Error(
+      "Please choose Automatic movie selection for now. " +
+      "Hero, heroine and director filtering will be connected separately."
+    );
+  }
+
+  const pool = await fetchTeluguMovies(startYear, count);
+
+  if (count > pool.length) {
+    throw Error(
+      "TMDB returned only " + pool.length +
+      " movies. Please choose a smaller movie count."
+    );
+  }
+
+  return {
+    budget,
+    count,
+    startYear,
+    endYear: new Date().getFullYear(),
+    description: "Telugu movies from " + startYear +
+      " to " + new Date().getFullYear(),
+    queue: shuffle(pool).slice(0, count)
+  };
 }
+
 async function createRoom(){
  if(!user)return say("Wait for Firebase to connect.");
  const name=$("playerName").value.trim().slice(0,20);if(!name){tone("error");return say("Please enter your name.");}
- let setup;try{setup=prepareQueue();}catch(e){tone("error");return say(e.message);}
+ let setup;try{setup=await prepareQueue();}catch(e){tone("error");return say(e.message);}
  roomCode=Math.random().toString(36).slice(2,8).toUpperCase();roomRef=db.ref("rooms/"+roomCode);
- const data={hostUid:user.uid,status:"lobby",startingBudget:setup.budget,movieCount:setup.count,selectionDescription:setup.description,movieQueue:setup.queue,round:0,players:{[user.uid]:{name,budget:setup.budget,score:0,bid:0,passed:false,moviesWon:0,moviesWonList:[]}}};
+ 
+const data={hostUid:user.uid,status:"lobby",startingBudget:setup.budget,movieCount:setup.count,movieStartYear:setup.startYear,movieEndYear:setup.endYear,selectionDescription:setup.description,movieQueue:setup.queue,round:0,players:{[user.uid]:{name,budget:setup.budget,score:0,bid:0,passed:false,moviesWon:0,moviesWonList:[]}}};
+
  try{await roomRef.set(data);listenRoom();say("Room created! Share the code with friends.");}
  catch(e){tone("error");say("Could not create room: "+e.message);}
 }
