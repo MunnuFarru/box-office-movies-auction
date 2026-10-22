@@ -72,11 +72,28 @@ footer{text-align:center;color:#8993b2;font-size:12px;padding:10px 16px 30px}
 <option value="auto">Automatic — random movies</option>
 <option value="manual">Manual — filter by person</option>
 </select>
+
 <div id="manualOptions" class="hidden">
-<label for="personType">Search by</label>
-<select id="personType">
-<option value="hero">Hero</option><option value="heroine">Heroine</option><option value="director">Director</option>
+  <label for="personType">Search by</label>
+  <select id="personType">
+    <option value="hero">Hero</option>
+    <option value="heroine">Heroine</option>
+    <option value="director">Director</option>
+  </select>
+</div>
+
+<label for="movieStartYear">Movies from year</label>
+<select id="movieStartYear">
+  <option value="1980">1980 onwards</option>
+  <option value="1990">1990 onwards</option>
+  <option value="2000">2000 onwards</option>
+  <option value="2006">2006 onwards</option>
+  <option value="2010">2010 onwards</option>
+  <option value="2020">2020 onwards</option>
 </select>
+
+<p class="muted">Movies will be selected up to the current year automatically.</p>
+
 <label for="personName">Person's name</label>
 <input id="personName" placeholder="Example: Prabhas">
 </div>
@@ -396,6 +413,109 @@ async function fetchTeluguMovies(startYear, requestedCount) {
 }
 
 
+
+async function fetchTeluguMovies(startYear, requestedCount) {
+  const currentYear = new Date().getFullYear();
+  const allMovies = [];
+  const seenIds = new Set();
+  let totalPages = 1;
+
+  for (
+    let page = 1;
+    page <= totalPages &&
+    page <= 500 &&
+    allMovies.length < requestedCount;
+    page++
+  ) {
+    const url = new URL(
+      "https://api.themoviedb.org/3/discover/movie"
+    );
+
+    url.searchParams.set("api_key", TMDB_API_KEY);
+    url.searchParams.set("with_original_language", "te");
+    url.searchParams.set(
+      "primary_release_date.gte",
+      `${startYear}-01-01`
+    );
+    url.searchParams.set(
+      "primary_release_date.lte",
+      `${currentYear}-12-31`
+    );
+    url.searchParams.set("sort_by", "popularity.desc");
+    url.searchParams.set("include_adult", "false");
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("TMDB could not load movies. Please try again.");
+    }
+
+    const data = await response.json();
+    totalPages = Math.min(data.total_pages || 1, 500);
+
+    for (const item of data.results || []) {
+      if (!item.id || seenIds.has(item.id)) continue;
+
+      const year = Number(item.release_date?.slice(0, 4));
+
+      if (!year || year < startYear || year > currentYear) continue;
+
+      seenIds.add(item.id);
+
+      let hero = "";
+      let heroine = "";
+      let director = "";
+
+      try {
+        const detailsUrl = new URL(
+          `https://api.themoviedb.org/3/movie/${item.id}`
+        );
+        detailsUrl.searchParams.set("api_key", TMDB_API_KEY);
+        detailsUrl.searchParams.set("append_to_response", "credits");
+
+        const detailsResponse = await fetch(detailsUrl);
+
+        if (detailsResponse.ok) {
+          const details = await detailsResponse.json();
+          const cast = details.credits?.cast || [];
+          const crew = details.credits?.crew || [];
+
+          hero = cast[0]?.name || "";
+          heroine = cast[1]?.name || "";
+          director = crew.find(person =>
+            person.job === "Director"
+          )?.name || "";
+        }
+      } catch (error) {
+        console.warn("Could not load movie credits:", item.title);
+      }
+
+      allMovies.push({
+        tmdbId: item.id,
+        name: item.title,
+        year,
+        hero,
+        heroine,
+        director,
+        tags: []
+      });
+
+      if (allMovies.length >= requestedCount) break;
+    }
+  }
+
+  if (allMovies.length < requestedCount) {
+    throw new Error(
+      "Only " + allMovies.length +
+      " matching Telugu movies were found. Please choose a smaller number."
+    );
+  }
+
+  return allMovies;
+}
+
+
  
 let user=null,roomCode="",roomRef=null,roomData=null,listener=null,advanceTimer=null,resolving=false,audioCtx=null,lastSoundResult="";
 const $=id=>document.getElementById(id);
@@ -436,45 +556,118 @@ async function prepareQueue() {
     throw Error("Starting budget must be a positive whole number.");
   }
 
+
+async function prepareQueue() {
+  const count = Number($("movieCount").value);
+  const budget = Number($("startingBudget").value);
+  const startYear = Number($("movieStartYear").value);
+
+  if (!Number.isInteger(count) || count < 1) {
+    throw Error("Choose at least 1 movie.");
+  }
+
+  if (!Number.isSafeInteger(budget) || budget < 1) {
+    throw Error("Starting budget must be a positive whole number.");
+  }
+
   if (
     !Number.isInteger(startYear) ||
-    startYear < 1980 ||
+    startYear < 1900 ||
     startYear > new Date().getFullYear()
   ) {
     throw Error("Please choose a valid starting year.");
   }
 
+  let pool = await fetchTeluguMovies(startYear, count);
+  let description = "Telugu movies from " + startYear + " onwards";
+
   if ($("selectionMode").value === "manual") {
-    throw Error(
-      "Please choose Automatic movie selection for now. " +
-      "Hero, heroine and director filtering will be connected separately."
+    const type = $("personType").value;
+    const name = $("personName").value.trim();
+
+    if (!name) {
+      throw Error("Enter a hero, heroine or director name.");
+    }
+
+    pool = pool.filter(movie =>
+      String(movie[type] || "")
+        .toLowerCase()
+        .includes(name.toLowerCase())
     );
+
+    description += " · Filtered by " + type + ": " + name;
   }
 
-  const pool = await fetchTeluguMovies(startYear, count);
-
-  if (count > pool.length) {
+  if (pool.length < count) {
     throw Error(
-      "TMDB returned only " + pool.length +
-      " movies. Please choose a smaller movie count."
+      "Only " + pool.length +
+      " matching movies found. Choose fewer movies or another name."
     );
   }
 
   return {
     budget,
     count,
-    startYear,
-    endYear: new Date().getFullYear(),
-    description: "Telugu movies from " + startYear +
-      " to " + new Date().getFullYear(),
+    description,
     queue: shuffle(pool).slice(0, count)
   };
 }
 
-async function createRoom(){
- if(!user)return say("Wait for Firebase to connect.");
- const name=$("playerName").value.trim().slice(0,20);if(!name){tone("error");return say("Please enter your name.");}
- let setup;try{setup=await prepareQueue();}catch(e){tone("error");return say(e.message);}
+async function createRoom() {
+  if (!user) {
+    return say("Wait for Firebase to connect.");
+  }
+
+  const name = $("playerName").value.trim().slice(0, 20);
+
+  if (!name) {
+    tone("error");
+    return say("Please enter your name.");
+  }
+
+  let setup;
+
+  try {
+    setup = await prepareQueue();
+  } catch (e) {
+    tone("error");
+    return say(e.message);
+  }
+
+  roomCode = Math.random().toString(36).slice(2, 8).toUpperCase();
+  roomRef = db.ref("rooms/" + roomCode);
+
+  const data = {
+    hostUid: user.uid,
+    status: "lobby",
+    startingBudget: setup.budget,
+    movieCount: setup.count,
+    selectionDescription: setup.description,
+    movieQueue: setup.queue,
+    round: 0,
+    players: {
+      [user.uid]: {
+        name,
+        budget: setup.budget,
+        score: 0,
+        bid: 0,
+        passed: false,
+        moviesWon: 0,
+        moviesWonList: []
+      }
+    }
+  };
+
+  try {
+    await roomRef.set(data);
+    listenRoom();
+    say("Room created! Share the code with friends.");
+  } catch (e) {
+    tone("error");
+    say("Could not create room: " + e.message);
+  }
+}
+
  roomCode=Math.random().toString(36).slice(2,8).toUpperCase();roomRef=db.ref("rooms/"+roomCode);
  
 const data={hostUid:user.uid,status:"lobby",startingBudget:setup.budget,movieCount:setup.count,movieStartYear:setup.startYear,movieEndYear:setup.endYear,selectionDescription:setup.description,movieQueue:setup.queue,round:0,players:{[user.uid]:{name,budget:setup.budget,score:0,bid:0,passed:false,moviesWon:0,moviesWonList:[]}}};
