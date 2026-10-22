@@ -668,13 +668,6 @@ async function createRoom() {
   }
 }
 
- roomCode=Math.random().toString(36).slice(2,8).toUpperCase();roomRef=db.ref("rooms/"+roomCode);
- 
-const data={hostUid:user.uid,status:"lobby",startingBudget:setup.budget,movieCount:setup.count,movieStartYear:setup.startYear,movieEndYear:setup.endYear,selectionDescription:setup.description,movieQueue:setup.queue,round:0,players:{[user.uid]:{name,budget:setup.budget,score:0,bid:0,passed:false,moviesWon:0,moviesWonList:[]}}};
-
- try{await roomRef.set(data);listenRoom();say("Room created! Share the code with friends.");}
- catch(e){tone("error");say("Could not create room: "+e.message);}
-}
 async function joinRoom(){
  if(!user)return say("Wait for Firebase to connect.");
  const code=$("roomInput").value.trim().toUpperCase(),name=$("playerName").value.trim().slice(0,20);
