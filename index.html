@@ -72,11 +72,28 @@ footer{text-align:center;color:#8993b2;font-size:12px;padding:10px 16px 30px}
 <option value="auto">Automatic — random movies</option>
 <option value="manual">Manual — filter by person</option>
 </select>
+
 <div id="manualOptions" class="hidden">
-<label for="personType">Search by</label>
-<select id="personType">
-<option value="hero">Hero</option><option value="heroine">Heroine</option><option value="director">Director</option>
+  <label for="personType">Search by</label>
+  <select id="personType">
+    <option value="hero">Hero</option>
+    <option value="heroine">Heroine</option>
+    <option value="director">Director</option>
+  </select>
+</div>
+
+<label for="movieStartYear">Movies from year</label>
+<select id="movieStartYear">
+  <option value="1980">1980 onwards</option>
+  <option value="1990">1990 onwards</option>
+  <option value="2000">2000 onwards</option>
+  <option value="2006">2006 onwards</option>
+  <option value="2010">2010 onwards</option>
+  <option value="2020">2020 onwards</option>
 </select>
+
+<p class="muted">Movies will be selected up to the current year automatically.</p>
+
 <label for="personName">Person's name</label>
 <input id="personName" placeholder="Example: Prabhas">
 </div>
@@ -321,6 +338,67 @@ async function loadMoviePoster(movie) {
     detailsEl.textContent =
       "Movie details could not be loaded. Please try again later.";
   }
+}
+
+async function fetchTeluguMovies(startYear) {
+  const currentYear = new Date().getFullYear();
+  const allMovies = [];
+  const seenIds = new Set();
+
+  for (let page = 1; page <= 5; page++) {
+    const url = new URL(
+      "https://api.themoviedb.org/3/discover/movie"
+    );
+
+    url.searchParams.set("api_key", TMDB_API_KEY);
+    url.searchParams.set("with_original_language", "te");
+    url.searchParams.set(
+      "primary_release_date.gte",
+      `${startYear}-01-01`
+    );
+    url.searchParams.set(
+      "primary_release_date.lte",
+      `${currentYear}-12-31`
+    );
+    url.searchParams.set("sort_by", "popularity.desc");
+    url.searchParams.set("include_adult", "false");
+    url.searchParams.set("page", String(page));
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error("Could not fetch Telugu movies from TMDB.");
+    }
+
+    const data = await response.json();
+
+    for (const item of data.results || []) {
+      if (!item.id || seenIds.has(item.id)) continue;
+
+      const year = Number(item.release_date?.slice(0, 4));
+      if (!year || year < startYear || year > currentYear) continue;
+
+      seenIds.add(item.id);
+
+      allMovies.push({
+        tmdbId: item.id,
+        name: item.title,
+        year,
+        hero: "",
+        heroine: "",
+        director: "",
+        tags: []
+      });
+    }
+
+    if (page >= (data.total_pages || 1)) break;
+  }
+
+  if (!allMovies.length) {
+    throw new Error("No Telugu movies found for that year range.");
+  }
+
+  return allMovies;
 }
 
 
