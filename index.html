@@ -412,9 +412,11 @@ function render(){
       (Number(b[1].moviesWon)||0)-(Number(a[1].moviesWon)||0)||
       (Number(b[1].budget)||0)-(Number(a[1].budget)||0)
     );
-    $("leaderboard").innerHTML=sorted.map(([id,p],i)=>
-      `<div class="player"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${safe(p.name)}</span><span>${p.moviesWon||0} movies • ${Number(p.budget).toLocaleString()} left</span></div>`
-    ).join("");
+  
+$("leaderboard").innerHTML=sorted.map(([id,p],i)=>
+  `<div class="player"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${safe(p.name)}</span><span>${p.moviesWon||0} movies • ${Number(p.budget).toLocaleString()} budget left</span></div>`
+).join("");
+
   }
 }
 
