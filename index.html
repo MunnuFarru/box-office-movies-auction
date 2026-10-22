@@ -420,12 +420,14 @@ $("leaderboard").innerHTML=sorted.map(([id,p],i)=>
   }
 }
 
+
 async function startRound(){
   if(!isHost||!roomData)return;
   if(players().length<2)return say("At least two players are needed.");
 
   const index=Number(roomData.round||0);
   const queue=roomData.movieQueue||[];
+
   if(index>=queue.length){
     await roomRef.update({status:"finished"});
     return;
@@ -434,18 +436,22 @@ async function startRound(){
   const updates={
     currentMovie:queue[index],
     round:index+1,
-    endsAt:Date.now()+30000,
     status:"auction",
     lastResult:""
   };
+
   players().forEach(([id])=>{
     updates["players/"+id+"/bid"]=0;
     updates["players/"+id+"/passed"]=false;
   });
 
-  try{await roomRef.update(updates)}
-  catch(e){say("Could not start round: "+e.message)}
+  try{
+    await roomRef.update(updates);
+  }catch(e){
+    say("Could not start round: "+e.message);
+  }
 }
+
 
 async function submitBid(){
   if(!roomData||roomData.status!=="auction")return;
@@ -489,44 +495,63 @@ function startTimer(){
 }
 function stopTimer(){if(timer)clearInterval(timer);timer=null}
 
+
 async function resolveRound(){
-  if(resolving||!isHost||!roomData||roomData.status!=="auction")return;
-  const current=players();
-  const everyonePassed=current.every(([id,p])=>p.passed);
-  const timeUp=Date.now()>=Number(roomData.endsAt||0);
-  if(!everyonePassed&&!timeUp)return;
+  if(resolving || !isHost || !roomData || roomData.status !== "auction") return;
 
-  resolving=true;
-  try{
-    const snap=await roomRef.get();
-    const fresh=snap.val();
-    if(!fresh||fresh.status!=="auction")return;
+  resolving = true;
 
-    const eligible=Object.entries(fresh.players||{})
-      .filter(([id,p])=>!p.passed&&Number(p.bid)>0&&Number(p.bid)<=Number(p.budget))
-      .sort((a,b)=>Number(b[1].bid)-Number(a[1].bid));
+  try {
+    const snap = await roomRef.get();
+    const fresh = snap.val();
 
-    const updates={status:"results"};
-    let result="No valid bids. Nobody won this movie.";
+    if(!fresh || fresh.status !== "auction") return;
 
-    if(eligible.length){
-      const highest=Number(eligible[0][1].bid);
-      const tied=eligible.filter(([id,p])=>Number(p.bid)===highest);
-      if(tied.length>1){
-        result="Tie between "+tied.map(([id,p])=>p.name).join(", ")+". No winner this round.";
-      }else{
-        const [winnerId,winner]=tied[0];
-        updates["players/"+winnerId+"/budget"]=Number(winner.budget)-highest;
-        updates["players/"+winnerId+"/moviesWon"]=Number(winner.moviesWon||0)+1;
-        result=winner.name+" won "+fresh.currentMovie.name+" with a bid of "+highest+".";
+    const eligible = Object.entries(fresh.players || {})
+      .filter(([id, p]) =>
+        !p.passed &&
+        Number(p.bid) > 0 &&
+        Number(p.bid) <= Number(p.budget)
+      )
+      .sort((a, b) => Number(b[1].bid) - Number(a[1].bid));
+
+    const updates = { status: "results" };
+    let result = "No valid bids. Nobody won this movie.";
+
+    if(eligible.length > 0){
+      const highest = Number(eligible[0][1].bid);
+      const tied = eligible.filter(
+        ([id, p]) => Number(p.bid) === highest
+      );
+
+      if(tied.length > 1){
+        result = "Tie between " +
+          tied.map(([id, p]) => p.name).join(", ") +
+          ". No winner this round.";
+      } else {
+        const [winnerId, winner] = tied[0];
+
+        updates["players/" + winnerId + "/budget"] =
+          Number(winner.budget) - highest;
+
+        updates["players/" + winnerId + "/moviesWon"] =
+          Number(winner.moviesWon || 0) + 1;
+
+        result = winner.name + " won " +
+          fresh.currentMovie.name +
+          " with a bid of " + highest + ".";
       }
     }
-    updates.lastResult=result;
-    await roomRef.update(updates);
-  }catch(e){say("Could not resolve round: "+e.message)}
-  finally{resolving=false}
-}
 
+    updates.lastResult = result;
+    await roomRef.update(updates);
+
+  } catch(e) {
+    say("Could not resolve round: " + e.message);
+  } finally {
+    resolving = false;
+  }
+}
 async function finishGame(){
   if(!isHost)return;
   try{await roomRef.update({status:"finished"})}
