@@ -210,6 +210,56 @@ const movies=[
 {name:"Indra",year:2002,hero:"Chiranjeevi",heroine:"Aarthi Agarwal",director:"B. Gopal",tags:["All-Time Hit"]}
 ];
 
+ 
+const TMDB_API_KEY = "PASTE_YOUR_V3_API_KEY_HERE";
+const tmdbPosterCache = {};
+
+async function loadMoviePoster(movie) {
+  const poster = document.getElementById("moviePoster");
+
+  if (!movie) {
+    poster.classList.add("hidden");
+    return;
+  }
+
+  const cacheKey = movie.name + "-" + movie.year;
+
+  try {
+    if (!tmdbPosterCache[cacheKey]) {
+      const url = new URL("https://api.themoviedb.org/3/search/movie");
+      url.searchParams.set("api_key", TMDB_API_KEY);
+      url.searchParams.set("query", movie.name);
+      url.searchParams.set("year", movie.year);
+      url.searchParams.set("include_adult", "false");
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("TMDB request failed");
+
+      const data = await response.json();
+      const match = (data.results || []).find(
+        item => item.poster_path
+      );
+
+      tmdbPosterCache[cacheKey] = match
+        ? "https://image.tmdb.org/t/p/w500" + match.poster_path
+        : null;
+    }
+
+    const posterUrl = tmdbPosterCache[cacheKey];
+
+    if (posterUrl) {
+      poster.src = posterUrl;
+      poster.classList.remove("hidden");
+    } else {
+      poster.classList.add("hidden");
+    }
+  } catch (error) {
+    poster.classList.add("hidden");
+    console.error("Could not load TMDB poster:", error);
+  }
+}
+
+ 
 let user=null,roomCode="",roomRef=null,roomData=null,listener=null,advanceTimer=null,resolving=false,audioCtx=null,lastSoundResult="";
 const $=id=>document.getElementById(id);
 const show=(id,on)=>$(id).classList.toggle("hidden",!on);
