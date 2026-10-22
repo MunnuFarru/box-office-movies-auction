@@ -107,25 +107,46 @@ hr{border:0;border-top:1px solid #343a55;margin:20px 0}
 <div id="timer" style="font-size:28px;font-weight:bold">--</div>
 </div>
 
+
 <div class="card">
-<h2>💰 Place Your Bid</h2>
-<label for="bidAmount">Your bid amount</label>
-<input id="bidAmount" type="number" min="1" step="1" placeholder="Enter bid">
-<button id="bidBtn">Submit / Update Bid</button>
-<button id="passBtn" class="secondary">Pass / Give Up</button>
-<p id="bidStatus" class="muted"></p>
+  <h2>💰 Place Your Bid</h2>
+
+  <label for="bidAmount">Your bid amount</label>
+  <input
+    id="bidAmount"
+    type="number"
+    min="1"
+    step="1"
+    placeholder="Enter bid"
+  >
+
+  <button id="bidBtn">Submit / Update Bid</button>
+
+  <button id="passBtn" class="secondary">
+    Pass / Give Up
+  </button>
+
+  <button id="endRoundBtn" class="secondary hidden">
+    End Round
+  </button>
+
+  <p id="bidStatus" class="muted"></p>
 </div>
 
 <div class="card">
-<h2>👥 Live Players</h2>
-<div id="gamePlayers"></div>
+  <h2>👥 Live Players</h2>
+  <div id="gamePlayers"></div>
 </div>
 
 <div id="resultCard" class="card hidden">
-<h2>🏆 Round Result</h2>
-<p id="roundResult"></p>
-<button id="nextBtn">Next Movie</button>
-<button id="finishBtn" class="secondary">Finish Game</button>
+  <h2>🏆 Round Result</h2>
+  <p id="roundResult"></p>
+
+  <button id="nextBtn">Next Movie</button>
+
+  <button id="finishBtn" class="secondary">
+    Finish Game
+  </button>
 </div>
 
 <div id="finalCard" class="card hidden">
