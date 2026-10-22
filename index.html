@@ -214,11 +214,14 @@ const movies=[
 const TMDB_API_KEY = "4fe6efa604f929bf22f01075106b0a20";
 const tmdbPosterCache = {};
 
+
 async function loadMoviePoster(movie) {
   const poster = document.getElementById("moviePoster");
+  const detailsEl = document.getElementById("movieDetails");
 
   if (!movie) {
     poster.classList.add("hidden");
+    detailsEl.textContent = "";
     return;
   }
 
@@ -226,38 +229,100 @@ async function loadMoviePoster(movie) {
 
   try {
     if (!tmdbPosterCache[cacheKey]) {
-      const url = new URL("https://api.themoviedb.org/3/search/movie");
-      url.searchParams.set("api_key", TMDB_API_KEY);
-      url.searchParams.set("query", movie.name);
-      url.searchParams.set("year", movie.year);
-      url.searchParams.set("include_adult", "false");
-
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("TMDB request failed");
-
-      const data = await response.json();
-      const match = (data.results || []).find(
-        item => item.poster_path
+      const searchUrl = new URL(
+        "https://api.themoviedb.org/3/search/movie"
       );
 
-      tmdbPosterCache[cacheKey] = match
-        ? "https://image.tmdb.org/t/p/w500" + match.poster_path
-        : null;
+      searchUrl.searchParams.set("api_key", TMDB_API_KEY);
+      searchUrl.searchParams.set("query", movie.name);
+      searchUrl.searchParams.set("year", movie.year);
+      searchUrl.searchParams.set("include_adult", "false");
+
+      const searchResponse = await fetch(searchUrl);
+
+      if (!searchResponse.ok) {
+        throw new Error("TMDB movie search failed");
+      }
+
+      const searchData = await searchResponse.json();
+      const results = searchData.results || [];
+
+      const match =
+        results.find(item => item.poster_path) ||
+        results[0];
+
+      let movieInfo = {
+        posterUrl: null,
+        year: movie.year || "",
+        genres: [],
+        overview: ""
+      };
+
+      if (match) {
+        movieInfo.posterUrl = match.poster_path
+          ? "https://image.tmdb.org/t/p/w500" +
+            match.poster_path
+          : null;
+
+        const detailsUrl = new URL(
+          "https://api.themoviedb.org/3/movie/" + match.id
+        );
+
+        detailsUrl.searchParams.set("api_key", TMDB_API_KEY);
+
+        const detailsResponse = await fetch(detailsUrl);
+
+        if (detailsResponse.ok) {
+          const details = await detailsResponse.json();
+
+          movieInfo.year =
+            details.release_date?.slice(0, 4) ||
+            movieInfo.year;
+
+          movieInfo.genres = (details.genres || [])
+            .map(genre => genre.name);
+
+          movieInfo.overview = details.overview || "";
+        }
+      }
+
+      tmdbPosterCache[cacheKey] = movieInfo;
     }
 
-    const posterUrl = tmdbPosterCache[cacheKey];
+    const info = tmdbPosterCache[cacheKey];
 
-    if (posterUrl) {
-      poster.src = posterUrl;
+    if (info.posterUrl) {
+      poster.src = info.posterUrl;
+      poster.alt = "Poster for " + movie.name;
       poster.classList.remove("hidden");
     } else {
+      poster.removeAttribute("src");
       poster.classList.add("hidden");
     }
+
+    const detailsParts = [
+      info.year ? "Year: " + info.year : "",
+      info.genres.length
+        ? "Genres: " + info.genres.join(", ")
+        : "",
+      info.overview
+        ? "Overview: " + info.overview
+        : ""
+    ].filter(Boolean);
+
+    detailsEl.textContent = detailsParts.join(" | ");
+
+    if (!detailsParts.length) {
+      detailsEl.textContent =
+        "Movie details are not available on TMDB.";
+    }
   } catch (error) {
-    poster.classList.add("hidden");
-    console.error("Could not load TMDB poster:", error);
+    console.error("Could not load TMDB movie details:", error);
+    detailsEl.textContent =
+      "Movie details could not be loaded. Please try again later.";
   }
 }
+
 
  
 let user=null,roomCode="",roomRef=null,roomData=null,listener=null,advanceTimer=null,resolving=false,audioCtx=null,lastSoundResult="";
