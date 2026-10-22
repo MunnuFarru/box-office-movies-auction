@@ -596,21 +596,30 @@ function leaveRoom(){
   say("You left the room.");
 }
 
+
 $("createBtn").addEventListener("click",createRoom);
 $("joinBtn").addEventListener("click",joinRoom);
 $("startBtn").addEventListener("click",startRound);
 $("bidBtn").addEventListener("click",submitBid);
 $("passBtn").addEventListener("click",passRound);
+$("endRoundBtn").addEventListener("click",resolveRound);
+
 $("nextBtn").addEventListener("click",()=>{
   if(Number(roomData?.round)>=Number(roomData?.movieCount))finishGame();
   else startRound();
 });
+
 $("finishBtn").addEventListener("click",finishGame);
 $("playAgainBtn").addEventListener("click",playAgain);
 $("leaveBtn").addEventListener("click",leaveRoom);
+
 $("copyBtn").addEventListener("click",async()=>{
-  try{await navigator.clipboard.writeText(roomCode);say("Room code copied: "+roomCode)}
-  catch(e){say("Share this room code: "+roomCode)}
+  try{
+    await navigator.clipboard.writeText(roomCode);
+    say("Room code copied: "+roomCode);
+  }catch(e){
+    say("Share this room code: "+roomCode);
+  }
 });
 </script>
 </body>
