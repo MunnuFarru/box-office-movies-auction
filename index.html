@@ -460,12 +460,18 @@ async function submitBid(){
 }
 
 async function passRound(){
-  if(!roomData||roomData.status!=="auction")return;
+  if(!roomData || roomData.status !== "auction") return;
+
   try{
-    await roomRef.child("players/"+user.uid).update({bid:0,passed:true});
+    await roomRef.child("players/" + user.uid + "/bid").set(0);
+    await roomRef.child("players/" + user.uid + "/passed").set(true);
+
     say("You passed this round.");
-    if(isHost)setTimeout(resolveRound,100);
-  }catch(e){say("Could not pass: "+e.message)}
+
+    if(isHost) setTimeout(resolveRound, 100);
+  }catch(e){
+    say("Could not pass: " + e.message);
+  }
 }
 
 function startTimer(){
