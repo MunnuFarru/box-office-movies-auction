@@ -467,6 +467,7 @@ async function submitBid(){
   }catch(e){say("Could not submit bid: "+e.message)}
 }
 
+
 async function passRound(){
   if(!roomData || roomData.status !== "auction") return;
 
@@ -475,12 +476,11 @@ async function passRound(){
     await roomRef.child("players/" + user.uid + "/passed").set(true);
 
     say("You passed this round.");
-
-    if(isHost) setTimeout(resolveRound, 100);
   }catch(e){
     say("Could not pass: " + e.message);
   }
 }
+
 
 function startTimer(){
   stopTimer();
