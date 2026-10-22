@@ -3,530 +3,566 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Box Office Battle | Movie Auction</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telugu Box Office Game</title>
 <style>
-:root {
-  --bg: #090b14;
-  --panel: #151929;
-  --gold: #ffc857;
-  --purple: #a78bfa;
-  --muted: #a7adc1;
-  --green: #55dfaa;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: radial-gradient(ellipse at top, #29204d 0%, var(--bg) 58%);
-  color: #fff;
-  font-family: Arial, sans-serif;
-  min-height: 100vh;
-}
-header {
-  text-align: center;
-  padding: 28px 15px 18px;
-  border-bottom: 1px solid #34344d;
-}
-.brand {
-  color: var(--gold);
-  letter-spacing: 4px;
-  font-size: 12px;
-  font-weight: bold;
-}
-h1 { margin: 12px 0 6px; font-size: clamp(27px, 5vw, 43px); }
-h1 span { color: var(--gold); }
-.subtitle { color: var(--muted); margin: 0; }
-main { max-width: 1050px; margin: auto; padding: 22px 14px 45px; }
-.panel {
-  background: rgba(21,25,41,.96);
-  border: 1px solid #353751;
-  border-radius: 17px;
-  padding: 20px;
-  margin-bottom: 18px;
-}
-h2 { margin: 0 0 15px; font-size: 21px; }
-h3 { margin: 0 0 9px; }
-label { display: block; color: var(--muted); margin: 12px 0 6px; }
-input, select {
-  width: 100%;
-  background: #0d1120;
-  color: white;
-  border: 1px solid #41445e;
-  border-radius: 9px;
-  padding: 12px;
-  font-size: 16px;
-}
-.names {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 8px 12px;
-}
-button {
-  border: 0;
-  border-radius: 10px;
-  padding: 12px 16px;
-  font-weight: bold;
-  font-size: 15px;
-  cursor: pointer;
-  transition: transform .15s, opacity .15s;
-}
-button:hover { transform: translateY(-1px); }
-button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.primary { background: var(--gold); color: #171321; }
-.secondary { background: #30284f; color: white; border: 1px solid #62528f; }
-.pass { background: #34384b; color: white; }
-button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-}
-.full { width: 100%; margin-top: 18px; }
-.small { color: var(--muted); font-size: 13px; line-height: 1.5; }
-.topline {
-  display: flex; flex-wrap: wrap; align-items: center;
-  justify-content: space-between; gap: 10px;
-}
-.pill {
-  display: inline-block; border: 1px solid #51476f;
-  background: #25213b; color: var(--gold);
-  border-radius: 30px; padding: 7px 12px; font-size: 13px;
-}
-.movie-card {
-  text-align: center; padding: 27px 16px;
-  background: linear-gradient(145deg, #382450, #17192d 65%, #29203c);
-  border: 1px solid #67507d; border-radius: 16px;
-  margin: 17px 0;
-}
-.film-icon { font-size: 46px; }
-.movie-card h2 { font-size: clamp(24px, 4vw, 34px); margin: 12px 0; }
-.collection { color: var(--gold); font-size: 23px; font-weight: bold; }
-.timer { color: var(--green); font-size: 25px; font-weight: bold; }
-.bid-info {
-  display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: 10px; margin: 15px 0;
-}
-.stat {
-  background: #0e1220; border: 1px solid #343950;
-  border-radius: 12px; padding: 13px;
-}
-.stat small { display: block; color: var(--muted); margin-bottom: 7px; }
-.stat strong { font-size: 20px; overflow-wrap: anywhere; }
-.actions {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-}
-.scoreboard {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-}
-.player-card {
-  background: #0e1220; border: 1px solid #343950;
-  border-radius: 12px; padding: 14px;
-}
-.player-card.leader { border-color: var(--gold); }
-.player-name { font-weight: bold; font-size: 17px; overflow-wrap: anywhere; }
-.player-score { color: var(--gold); font-size: 22px; font-weight: bold; margin: 8px 0; }
-.player-meta { color: var(--muted); font-size: 13px; line-height: 1.7; }
-.movie-list { margin: 8px 0 0; padding-left: 19px; color: #dedff0; font-size: 13px; }
-.movie-list li { margin: 4px 0; }
-.status {
-  background: #102a27; color: #9ff2d2; border-radius: 10px;
-  padding: 12px; margin-top: 14px; line-height: 1.5;
-}
-.warning { background: #332718; color: #ffe0a1; }
-.rules { color: #d6d8e8; line-height: 1.8; padding-left: 21px; }
-.rules strong { color: var(--gold); }
-.hidden { display: none !important; }
-footer { text-align: center; color: var(--muted); font-size: 12px; padding: 10px; }
-@media (max-width: 480px) {
-  main { padding: 15px 10px 30px; }
-  .panel { padding: 15px; }
-  .actions button { padding: 12px 8px; font-size: 14px; }
-  .bid-info { gap: 7px; }
-}
+*{box-sizing:border-box}
+body{margin:0;background:#101323;color:#fff;font-family:Arial,sans-serif}
+header{text-align:center;padding:25px 12px;background:linear-gradient(135deg,#7028e4,#e52e71)}
+header h1{margin:0 0 8px;font-size:27px}
+main{width:min(850px,94%);margin:20px auto}
+.card{background:#1d2238;border:1px solid #343a55;padding:18px;border-radius:15px;margin-bottom:16px}
+h2,h3{margin-top:0}
+label{display:block;margin-top:12px;font-size:14px;color:#d5d9e9}
+input,select,button{width:100%;padding:12px;margin:6px 0;border-radius:9px;font-size:16px}
+input,select{background:#111629;color:#fff;border:1px solid #505873}
+button{border:0;background:#e52e71;color:#fff;font-weight:bold;cursor:pointer}
+button.secondary{background:#414968}
+button:disabled{opacity:.5;cursor:not-allowed}
+.muted{color:#bbc3dc;font-size:14px;line-height:1.5}
+.hidden{display:none!important}
+.movie{text-align:center;padding:26px 12px;border-radius:13px;background:linear-gradient(135deg,#35205d,#64244b)}
+.movie h2{font-size:27px;margin:10px 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{text-align:center;background:#111629;padding:12px 5px;border-radius:9px}
+.stat strong{display:block;font-size:20px;margin-top:7px}
+.player{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #343a55}
+hr{border:0;border-top:1px solid #343a55;margin:20px 0}
+@media(max-width:480px){.stats{grid-template-columns:1fr}header h1{font-size:23px}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand">★ THE MOVIE ARENA ★</div>
-  <h1>BOX OFFICE <span>BATTLE</span></h1>
-  <p class="subtitle">Pick your players. Bid on movies. Build a winning portfolio.</p>
+<h1>🎬 Telugu Box Office Game</h1>
+<p>Build your collection. Beat your friends. Become the winner!</p>
 </header>
 
 <main>
-  <section class="panel" id="setup">
-    <h2>🎟️ Set Up Your Game</h2>
-    <p class="small">Choose your players and starting budget before the auction begins.</p>
+<div class="card">
+<strong id="connection">Connecting...</strong>
+<p id="message" class="muted">Please wait while the game connects.</p>
+</div>
 
-    <label for="playerCount">Number of players</label>
-    <select id="playerCount" onchange="makeNameFields()">
-      <option value="4">4 players</option>
-      <option value="5">5 players</option>
-      <option value="6">6 players</option>
-      <option value="7">7 players</option>
-      <option value="8">8 players</option>
-    </select>
+<section id="home" class="card">
+<h2>🎮 Create Your Game</h2>
+<label for="playerName">Your name</label>
+<input id="playerName" maxlength="20" placeholder="Enter your name">
 
-    <label for="budget">Starting budget per player (₹ crore)</label>
-    <input id="budget" type="number" min="5" max="10000" value="100">
+<label for="startingBudget">Starting budget for EACH player</label>
+<input id="startingBudget" type="number" min="1" value="1000">
 
-    <label>Player names</label>
-    <div id="nameFields" class="names"></div>
+<label for="movieCount">Number of movies in this game</label>
+<input id="movieCount" type="number" min="1" max="40" value="11">
+<p class="muted">Choose 5, 7, 11 or any number supported by the available movie list.</p>
 
-    <button class="primary full" onclick="startGame()">START AUCTION →</button>
-  </section>
+<label for="selectionMode">Movie selection mode</label>
+<select id="selectionMode">
+<option value="auto">Automatic — random Telugu movies</option>
+<option value="manual">Manual — select by person</option>
+</select>
 
-  <section id="game" class="hidden">
-    <div class="panel">
-      <div class="topline">
-        <span class="pill" id="roundBadge">ROUND 1 / 10</span>
-        <span class="pill">🎬 MOVIE AUCTION</span>
-        <span class="pill">⏱️ <span id="timer">30</span> sec</span>
-      </div>
+<div id="manualOptions" class="hidden">
+<label for="personType">Search by</label>
+<select id="personType">
+<option value="hero">Hero name</option>
+<option value="heroine">Heroine name</option>
+<option value="director">Director name</option>
+</select>
+<label for="personName">Enter the name</label>
+<input id="personName" placeholder="Example: Prabhas">
+<p class="muted">Only movies matching this person in the included catalogue can be selected.</p>
+</div>
 
-      <div class="movie-card">
-        <div class="film-icon">🎞️</div>
-        <p class="small">MOVIE UP FOR AUCTION</p>
-        <h2 id="movieTitle">Movie title</h2>
-        <div class="collection" id="movieCollection">₹0 crore</div>
-        <p class="small">Sample estimated collection · used to calculate game scores</p>
-      </div>
+<button id="createBtn">Create Room</button>
 
-      <div class="bid-info">
-        <div class="stat">
-          <small>HIGHEST BID</small>
-          <strong id="highestBid">₹0 crore</strong>
-        </div>
-        <div class="stat">
-          <small>LEADING BIDDER</small>
-          <strong id="leadingBidder">No bids yet</strong>
-        </div>
-      </div>
+<hr>
+<h3>Join a friend's room</h3>
+<label for="roomInput">Room code</label>
+<input id="roomInput" maxlength="6" placeholder="Enter 6-character code">
+<button id="joinBtn" class="secondary">Join Room</button>
+</section>
 
-      <div class="status" id="turnStatus" aria-live="polite">Auction ready.</div>
-      <p class="small">Each bid increases the price by ₹5 crore. Players who pass cannot bid again in that round.</p>
+<section id="lobby" class="card hidden">
+<h2>🏠 Room Lobby</h2>
+<p>Room code: <strong id="roomCodeDisplay"></strong></p>
+<button id="copyBtn" class="secondary">Copy Room Code</button>
+<p id="settingsSummary" class="muted"></p>
+<div id="lobbyPlayers"></div>
+<button id="startBtn">Start Game</button>
+<p class="muted">Share the room code with your friends. Maximum 8 players.</p>
+</section>
 
-      <div class="actions">
-        <button class="primary" id="bidButton" onclick="placeBid()">BID + ₹5 CRORE</button>
-        <button class="pass" id="passButton" onclick="passTurn()">PASS</button>
-      </div>
-      <button class="primary full hidden" id="nextButton" onclick="nextRound()">NEXT ROUND →</button>
-    </div>
+<section id="game" class="hidden">
+<div class="card stats">
+<div class="stat">Your budget<strong id="myBudget">0</strong></div>
+<div class="stat">Movies won<strong id="myScore">0</strong></div>
+<div class="stat">Round<strong id="roundNumber">0</strong></div>
+</div>
 
-    <div class="panel">
-      <div class="topline">
-        <h2>🏆 Live Leaderboard</h2>
-        <span class="pill" id="moviesLeft">Movies remaining: 20</span>
-      </div>
-      <div id="scoreboard" class="scoreboard"></div>
-    </div>
+<div class="card movie">
+<p>🎞️ MOVIE UP FOR AUCTION</p>
+<h2 id="movieName">Waiting...</h2>
+<p id="movieDetails" class="muted"></p>
+<p>Time remaining</p>
+<div id="timer" style="font-size:28px;font-weight:bold">--</div>
+</div>
 
-    <div class="panel">
-      <h2>📜 Game Rules</h2>
-      <ol class="rules">
-        <li>Each player starts with the budget chosen at setup.</li>
-        <li>A random movie appears in each round. Its sample collection is the score awarded to the owner.</li>
-        <li>Players bid in turn, raising the price by <strong>₹5 crore</strong> each time.</li>
-        <li>Never bid more than your remaining budget. Passing removes you from that round's auction.</li>
-        <li>The highest bidder wins the movie and pays their winning bid from their budget.</li>
-        <li>If the timer runs out, the current highest bidder wins. If nobody bids, the movie is skipped.</li>
-        <li>After 10 rounds, the player with the highest combined movie collection wins. Ties are possible.</li>
-      </ol>
-      <p class="small">Collections are illustrative sample values, not official or live box-office data.</p>
-    </div>
-  </section>
+<div class="card">
+<h2>💰 Place Your Bid</h2>
+<label for="bidAmount">Your bid amount</label>
+<input id="bidAmount" type="number" min="1" step="1" placeholder="Enter bid">
+<button id="bidBtn">Submit / Update Bid</button>
+<button id="passBtn" class="secondary">Pass / Give Up</button>
+<p id="bidStatus" class="muted"></p>
+</div>
 
-  <section id="finalScreen" class="panel hidden">
-    <div class="film-icon">🏆</div>
-    <h2>THE FINAL VERDICT</h2>
-    <div id="winnerText" class="status"></div>
-    <h3 style="margin-top:20px">Final Rankings</h3>
-    <div id="finalScores" class="scoreboard"></div>
-    <button class="primary full" onclick="location.reload()">PLAY AGAIN ↻</button>
-  </section>
+<div class="card">
+<h2>👥 Live Players</h2>
+<div id="gamePlayers"></div>
+</div>
+
+<div id="resultCard" class="card hidden">
+<h2>🏆 Round Result</h2>
+<p id="roundResult"></p>
+<button id="nextBtn">Next Movie</button>
+<button id="finishBtn" class="secondary">Finish Game</button>
+</div>
+
+<div id="finalCard" class="card hidden">
+<h2>🏆 Final Leaderboard</h2>
+<div id="leaderboard"></div>
+<button id="playAgainBtn">Play Again</button>
+<button id="leaveBtn" class="secondary">Leave Room</button>
+</div>
+</section>
 </main>
 
-<footer>BOX OFFICE BATTLE · A fan-made movie auction game</footer>
-
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script>
-const MOVIES = [
-  {title:"Pushpa 2: The Rule", collection:1800},
-  {title:"Baahubali 2: The Conclusion", collection:1788},
-  {title:"RRR", collection:1230},
-  {title:"Kalki 2898 AD", collection:1000},
-  {title:"Salaar", collection:700},
-  {title:"Baahubali: The Beginning", collection:650},
-  {title:"Devara", collection:400},
-  {title:"Pushpa: The Rise", collection:365},
-  {title:"Hanu-Man", collection:300},
-  {title:"Ala Vaikunthapurramuloo", collection:280},
-  {title:"Sarileru Neekevvaru", collection:260},
-  {title:"Sye Raa Narasimha Reddy", collection:240},
-  {title:"Rangasthalam", collection:216},
-  {title:"Guntur Kaaram", collection:180},
-  {title:"Maharshi", collection:175},
-  {title:"Aravinda Sametha", collection:160},
-  {title:"Magadheera", collection:150},
-  {title:"Janatha Garage", collection:135},
-  {title:"Dookudu", collection:100},
-  {title:"Vikramarkudu", collection:70}
+const firebaseConfig = {
+  apiKey: "AIzaSyB8QrdF4pxxBX8l-WIW_km_nWt_jiHyaXg",
+  authDomain: "box-office-game-37cd0.firebaseapp.com",
+  databaseURL: "https://box-office-game-37cd0-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "box-office-game-37cd0",
+  storageBucket: "box-office-game-37cd0.firebasestorage.app",
+  messagingSenderId: "38817152052",
+  appId: "1:38817152052:web:4cbe74b3d0c17e99071e61"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+const movies = [
+{name:"Baahubali: The Beginning",year:2015,hero:"Prabhas",heroine:"Tamannaah",director:"S. S. Rajamouli"},
+{name:"Baahubali 2: The Conclusion",year:2017,hero:"Prabhas",heroine:"Anushka Shetty",director:"S. S. Rajamouli"},
+{name:"RRR",year:2022,hero:"N. T. Rama Rao Jr. / Ram Charan",heroine:"Alia Bhatt",director:"S. S. Rajamouli"},
+{name:"Magadheera",year:2009,hero:"Ram Charan",heroine:"Kajal Aggarwal",director:"S. S. Rajamouli"},
+{name:"Eega",year:2012,hero:"Nani",heroine:"Samantha Ruth Prabhu",director:"S. S. Rajamouli"},
+{name:"Rangasthalam",year:2018,hero:"Ram Charan",heroine:"Samantha Ruth Prabhu",director:"Sukumar"},
+{name:"Pushpa: The Rise",year:2021,hero:"Allu Arjun",heroine:"Rashmika Mandanna",director:"Sukumar"},
+{name:"Pushpa 2: The Rule",year:2024,hero:"Allu Arjun",heroine:"Rashmika Mandanna",director:"Sukumar"},
+{name:"Arya",year:2004,hero:"Allu Arjun",heroine:"Anu Mehta",director:"Sukumar"},
+{name:"Arya 2",year:2009,hero:"Allu Arjun",heroine:"Kajal Aggarwal",director:"Sukumar"},
+{name:"Pokiri",year:2006,hero:"Mahesh Babu",heroine:"Ileana D'Cruz",director:"Puri Jagannadh"},
+{name:"Businessman",year:2012,hero:"Mahesh Babu",heroine:"Kajal Aggarwal",director:"Puri Jagannadh"},
+{name:"Temper",year:2015,hero:"N. T. Rama Rao Jr.",heroine:"Kajal Aggarwal",director:"Puri Jagannadh"},
+{name:"iSmart Shankar",year:2019,hero:"Ram Pothineni",heroine:"Nidhhi Agerwal",director:"Puri Jagannadh"},
+{name:"Athadu",year:2005,hero:"Mahesh Babu",heroine:"Trisha Krishnan",director:"Trivikram Srinivas"},
+{name:"Jalsa",year:2008,hero:"Pawan Kalyan",heroine:"Ileana D'Cruz",director:"Trivikram Srinivas"},
+{name:"Ala Vaikunthapurramuloo",year:2020,hero:"Allu Arjun",heroine:"Pooja Hegde",director:"Trivikram Srinivas"},
+{name:"Guntur Kaaram",year:2024,hero:"Mahesh Babu",heroine:"Sreeleela",director:"Trivikram Srinivas"},
+{name:"Aravinda Sametha",year:2018,hero:"N. T. Rama Rao Jr.",heroine:"Pooja Hegde",director:"Trivikram Srinivas"},
+{name:"Devara",year:2024,hero:"N. T. Rama Rao Jr.",heroine:"Janhvi Kapoor",director:"Koratala Siva"},
+{name:"Janatha Garage",year:2016,hero:"N. T. Rama Rao Jr.",heroine:"Samantha Ruth Prabhu",director:"Koratala Siva"},
+{name:"Srimanthudu",year:2015,hero:"Mahesh Babu",heroine:"Shruti Haasan",director:"Koratala Siva"},
+{name:"Mirchi",year:2013,hero:"Prabhas",heroine:"Anushka Shetty",director:"Koratala Siva"},
+{name:"Salaar",year:2023,hero:"Prabhas",heroine:"Shruti Haasan",director:"Prashanth Neel"},
+{name:"Kalki 2898 AD",year:2024,hero:"Prabhas",heroine:"Deepika Padukone",director:"Nag Ashwin"},
+{name:"Mahanati",year:2018,hero:"Dulquer Salmaan",heroine:"Keerthy Suresh",director:"Nag Ashwin"},
+{name:"Jersey",year:2019,hero:"Nani",heroine:"Shraddha Srinath",director:"Gowtam Tinnanuri"},
+{name:"Hi Nanna",year:2023,hero:"Nani",heroine:"Mrunal Thakur",director:"Shouryuv"},
+{name:"Dasara",year:2023,hero:"Nani",heroine:"Keerthy Suresh",director:"Srikanth Odela"},
+{name:"Bhale Bhale Magadivoy",year:2015,hero:"Nani",heroine:"Lavanya Tripathi",director:"Maruthi"},
+{name:"Geetha Govindam",year:2018,hero:"Vijay Deverakonda",heroine:"Rashmika Mandanna",director:"Parasuram"},
+{name:"Arjun Reddy",year:2017,hero:"Vijay Deverakonda",heroine:"Shalini Pandey",director:"Sandeep Reddy Vanga"},
+{name:"Taxiwaala",year:2018,hero:"Vijay Deverakonda",heroine:"Priyanka Jawalkar",director:"Rahul Sankrityan"},
+{name:"Fidaa",year:2017,hero:"Varun Tej",heroine:"Sai Pallavi",director:"Sekhar Kammula"},
+{name:"Love Story",year:2021,hero:"Naga Chaitanya",heroine:"Sai Pallavi",director:"Sekhar Kammula"},
+{name:"Happy Days",year:2007,hero:"Varun Sandesh",heroine:"Tamannaah",director:"Sekhar Kammula"},
+{name:"Vikramarkudu",year:2006,hero:"Ravi Teja",heroine:"Anushka Shetty",director:"S. S. Rajamouli"},
+{name:"Krack",year:2021,hero:"Ravi Teja",heroine:"Shruti Haasan",director:"Gopichand Malineni"},
+{name:"Venky",year:2004,hero:"Ravi Teja",heroine:"Sneha",director:"Srinu Vaitla"},
+{name:"Waltair Veerayya",year:2023,hero:"Chiranjeevi",heroine:"Shruti Haasan",director:"K. S. Ravindra"},
+{name:"Indra",year:2002,hero:"Chiranjeevi",heroine:"Aarthi Agarwal",director:"B. Gopal"}
 ];
 
-const $ = id => document.getElementById(id);
-const money = n => "₹" + n + " crore";
-const safe = s => String(s).replace(/[&<>"']/g, c => ({
-  "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
-}[c]));
+let user=null, roomCode="", roomRef=null, roomData=null;
+let isHost=false, listener=null, timer=null, resolving=false;
 
-let players = [];
-let remainingMovies = [];
-let currentMovie = null;
-let round = 0;
-let currentBid = 0;
-let highBidder = -1;
-let turnIndex = -1;
-let passed = new Set();
-let seconds = 30;
-let timerId = null;
-let gameOver = false;
-const MAX_ROUNDS = 10;
-const BID_STEP = 5;
+const $=id=>document.getElementById(id);
+const show=(id,on)=>$(id).classList.toggle("hidden",!on);
+const say=message=>{$("message").textContent=message};
+const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const players=()=>Object.entries(roomData?.players||{});
 
-function makeNameFields() {
-  const count = Number($("playerCount").value);
-  $("nameFields").innerHTML = Array.from({length:count}, (_, i) =>
-    '<div><label for="player'+i+'">Player '+(i+1)+'</label>' +
-    '<input id="player'+i+'" maxlength="24" value="Player '+(i+1)+'" required></div>'
-  ).join("");
+auth.signInAnonymously().catch(e=>{
+  $("connection").textContent="Connection problem";
+  say(e.message);
+});
+auth.onAuthStateChanged(u=>{
+  if(!u)return;
+  user=u;
+  $("connection").textContent="Connected to Firebase";
+  say("Ready! Create a game or join your friend's room.");
+});
+
+$("selectionMode").addEventListener("change",()=>{
+  show("manualOptions",$("selectionMode").value==="manual");
+});
+
+function screen(name){
+  show("home",name==="home");
+  show("lobby",name==="lobby");
+  show("game",name==="game");
 }
-makeNameFields();
 
-function startGame() {
-  const count = Number($("playerCount").value);
-  const budget = Number($("budget").value);
-  if (!Number.isFinite(budget) || budget < 5) {
-    alert("Please enter a starting budget of at least ₹5 crore.");
-    return;
+function shuffle(list){
+  const copy=[...list];
+  for(let i=copy.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [copy[i],copy[j]]=[copy[j],copy[i]];
+  }
+  return copy;
+}
+
+function prepareMovieQueue(){
+  const count=Number($("movieCount").value);
+  const budget=Number($("startingBudget").value);
+  const mode=$("selectionMode").value;
+
+  if(!Number.isInteger(count)||count<1||count>movies.length){
+    throw new Error("Choose a movie count from 1 to "+movies.length+".");
+  }
+  if(!Number.isSafeInteger(budget)||budget<1){
+    throw new Error("Enter a starting budget greater than zero.");
   }
 
-  const names = Array.from({length:count}, (_, i) =>
-    $("player"+i).value.trim() || "Player "+(i+1)
-  );
+  let pool=[...movies];
+  let description="Random Telugu movies";
 
-  if (new Set(names.map(n => n.toLowerCase())).size !== names.length) {
-    alert("Please give every player a different name.");
-    return;
+  if(mode==="manual"){
+    const type=$("personType").value;
+    const name=$("personName").value.trim();
+    if(!name)throw new Error("Enter the hero, heroine or director name.");
+    pool=pool.filter(m=>m[type].toLowerCase().includes(name.toLowerCase()));
+    description="Movies matching "+type+": "+name;
   }
 
-  players = names.map(name => ({
-    name, budget, spent:0, total:0, movies:[]
-  }));
-  remainingMovies = [...MOVIES];
-  round = 0;
-  gameOver = false;
+  // Different movie titles only; different films by the same hero are allowed.
+  pool=shuffle([...new Map(pool.map(m=>[m.name,m])).values()]);
+  if(pool.length<count){
+    throw new Error("Only "+pool.length+" matching movies are in this starter catalogue. Choose fewer movies or try another name.");
+  }
 
-  $("setup").classList.add("hidden");
-  $("finalScreen").classList.add("hidden");
-  $("game").classList.remove("hidden");
-  nextRound();
+  return {queue:pool.slice(0,count),budget,description};
 }
 
-function stopTimer() {
-  if (timerId !== null) clearInterval(timerId);
-  timerId = null;
+function makeRoomCode(){
+  return Math.random().toString(36).slice(2,8).toUpperCase();
 }
 
-function startTimer() {
-  stopTimer();
-  seconds = 30;
-  $("timer").textContent = seconds;
-  timerId = setInterval(() => {
-    seconds--;
-    $("timer").textContent = seconds;
-    if (seconds <= 0) {
-      stopTimer();
-      resolveAuction(true);
+async function createRoom(){
+  if(!user)return say("Please wait for Firebase to connect.");
+  let setup;
+  try{setup=prepareMovieQueue()}catch(e){return say(e.message)}
+
+  const code=makeRoomCode();
+  roomCode=code;
+  roomRef=db.ref("rooms/"+code);
+  isHost=true;
+
+  const initial={
+    hostUid:user.uid,
+    status:"lobby",
+    startingBudget:setup.budget,
+    movieCount:setup.queue.length,
+    selectionDescription:setup.description,
+    movieQueue:setup.queue,
+    round:0,
+    players:{
+      [user.uid]:{
+        name:$("playerName").value.trim().slice(0,20)||"Player",
+        budget:setup.budget,
+        score:0,
+        bid:0,
+        passed:false,
+        moviesWon:0
+      }
+    },
+    createdAt:Date.now()
+  };
+
+  try{
+    await roomRef.set(initial);
+    listenRoom();
+    say("Room created! Share the code with your friends.");
+  }catch(e){
+    say("Could not create room: "+e.message+
+      ". Firebase database rules are still locked; we must configure safe rules before the game can connect.");
+  }
+}
+
+async function joinRoom(){
+  if(!user)return say("Please wait for Firebase to connect.");
+  const code=$("roomInput").value.trim().toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(code))return say("Enter a valid 6-character room code.");
+
+  const ref=db.ref("rooms/"+code);
+  try{
+    const snap=await ref.get();
+    if(!snap.exists())return say("Room not found. Check the code.");
+    const r=snap.val();
+    const current=r.players||{};
+    if(r.status!=="lobby")return say("This game has already started.");
+    if(!current[user.uid]&&Object.keys(current).length>=8)return say("This room already has 8 players.");
+
+    if(!current[user.uid]){
+      await ref.child("players/"+user.uid).set({
+        name:$("playerName").value.trim().slice(0,20)||"Player",
+        budget:r.startingBudget,score:0,bid:0,passed:false,moviesWon:0
+      });
     }
-  }, 1000);
+    roomCode=code;
+    roomRef=ref;
+    isHost=r.hostUid===user.uid;
+    listenRoom();
+  }catch(e){
+    say("Could not join room: "+e.message+
+      ". Check Firebase database permissions.");
+  }
 }
 
-function nextRound() {
-  stopTimer();
-  if (round >= MAX_ROUNDS || remainingMovies.length === 0) {
-    finishGame();
+function listenRoom(){
+  if(listener&&roomRef)roomRef.off("value",listener);
+  listener=snap=>{
+    roomData=snap.val();
+    if(!roomData){say("Room no longer exists.");return;}
+    isHost=roomData.hostUid===user.uid;
+    render();
+  };
+  roomRef.on("value",listener,e=>say("Database access error: "+e.message));
+}
+
+function render(){
+  $("roomCodeDisplay").textContent=roomCode;
+  $("settingsSummary").textContent=
+    "Budget per player: "+Number(roomData.startingBudget).toLocaleString()+
+    " | Movies: "+roomData.movieCount+
+    " | Mode: "+roomData.selectionDescription;
+
+  $("lobbyPlayers").innerHTML=players().map(([id,p])=>
+    `<div class="player"><span>${safe(p.name)}${id===roomData.hostUid?" 👑":""}</span><span>${Number(p.budget).toLocaleString()} pts</span></div>`
+  ).join("");
+
+  $("startBtn").disabled=!isHost||players().length<2;
+  $("startBtn").textContent=players().length<2?"Waiting for at least 2 players":"Start Game";
+
+  if(roomData.status==="lobby"){stopTimer();screen("lobby");return}
+  screen("game");
+
+  show("resultCard",roomData.status==="results");
+  show("finalCard",roomData.status==="finished");
+
+  const me=roomData.players?.[user.uid];
+  if(me){
+    $("myBudget").textContent=Number(me.budget).toLocaleString();
+    $("myScore").textContent=Number(me.moviesWon||0);
+    $("bidStatus").textContent=me.passed?"You passed this round.":me.bid>0?"Your bid: "+me.bid:"No bid submitted yet.";
+  }
+
+  $("roundNumber").textContent=roomData.round||0;
+  const movie=roomData.currentMovie;
+  $("movieName").textContent=movie?.name||"Game finished";
+  $("movieDetails").textContent=movie?movie.year+" • Hero: "+movie.hero+" • Heroine: "+movie.heroine+" • Director: "+movie.director:"";
+
+  $("gamePlayers").innerHTML=players().map(([id,p])=>
+    `<div class="player"><span>${safe(p.name)}${id===roomData.hostUid?" 👑":""}</span><span>${p.passed?"Passed":p.bid>0?"Bid: "+Number(p.bid).toLocaleString():"Waiting"}</span></div>`
+  ).join("");
+
+  const auction=roomData.status==="auction";
+  $("bidBtn").disabled=!auction||!!me?.passed;
+  $("passBtn").disabled=!auction||!!me?.passed;
+  $("bidAmount").disabled=!auction||!!me?.passed;
+  $("nextBtn").disabled=!isHost||!auction===false;
+  $("finishBtn").disabled=!isHost||roomData.status!=="results";
+
+  if(auction)startTimer();else stopTimer();
+
+  if(roomData.status==="results"){
+    $("roundResult").textContent=roomData.lastResult||"Round complete.";
+    $("nextBtn").disabled=!isHost;
+    $("nextBtn").textContent=Number(roomData.round)>=Number(roomData.movieCount)?"All Movies Finished":"Next Movie";
+  }
+
+  if(roomData.status==="finished"){
+    const sorted=players().sort((a,b)=>
+      (Number(b[1].moviesWon)||0)-(Number(a[1].moviesWon)||0)||
+      (Number(b[1].budget)||0)-(Number(a[1].budget)||0)
+    );
+    $("leaderboard").innerHTML=sorted.map(([id,p],i)=>
+      `<div class="player"><span>${["🥇","🥈","🥉"][i]||(i+1)+"."} ${safe(p.name)}</span><span>${p.moviesWon||0} movies • ${Number(p.budget).toLocaleString()} left</span></div>`
+    ).join("");
+  }
+}
+
+async function startRound(){
+  if(!isHost||!roomData)return;
+  if(players().length<2)return say("At least two players are needed.");
+
+  const index=Number(roomData.round||0);
+  const queue=roomData.movieQueue||[];
+  if(index>=queue.length){
+    await roomRef.update({status:"finished"});
     return;
   }
 
-  round++;
-  currentMovie = remainingMovies.splice(
-    Math.floor(Math.random() * remainingMovies.length), 1
-  )[0];
-  currentBid = 0;
-  highBidder = -1;
-  turnIndex = 0;
-  passed = new Set();
+  const updates={
+    currentMovie:queue[index],
+    round:index+1,
+    endsAt:Date.now()+30000,
+    status:"auction",
+    lastResult:""
+  };
+  players().forEach(([id])=>{
+    updates["players/"+id+"/bid"]=0;
+    updates["players/"+id+"/passed"]=false;
+  });
 
-  $("roundBadge").textContent = "ROUND " + round + " / " + MAX_ROUNDS;
-  $("movieTitle").textContent = currentMovie.title;
-  $("movieCollection").textContent = money(currentMovie.collection);
-  $("highestBid").textContent = money(0);
-  $("leadingBidder").textContent = "No bids yet";
-  $("turnStatus").className = "status";
-  $("turnStatus").textContent = "Auction open! " + players[turnIndex].name + " starts.";
-  $("bidButton").classList.remove("hidden");
-  $("passButton").classList.remove("hidden");
-  $("nextButton").classList.add("hidden");
-  $("bidButton").disabled = false;
-  $("passButton").disabled = false;
-
-  renderScores();
-  startTimer();
-  updateTurn();
+  try{await roomRef.update(updates)}
+  catch(e){say("Could not start round: "+e.message)}
 }
 
-function eligible(i) {
-  return !passed.has(i) && i !== highBidder &&
-    players[i].budget >= currentBid + BID_STEP;
+async function submitBid(){
+  if(!roomData||roomData.status!=="auction")return;
+  const amount=Number($("bidAmount").value);
+  const me=roomData.players?.[user.uid];
+  if(!Number.isSafeInteger(amount)||amount<1)return say("Enter a whole number greater than zero.");
+  if(!me||amount>Number(me.budget))return say("Your bid cannot exceed your remaining budget.");
+  if(me.passed)return say("You already passed this round.");
+
+  try{
+    await roomRef.child("players/"+user.uid+"/bid").set(amount);
+    say("Bid submitted.");
+  }catch(e){say("Could not submit bid: "+e.message)}
 }
 
-function updateTurn() {
-  if (gameOver) return;
+async function passRound(){
+  if(!roomData||roomData.status!=="auction")return;
+  try{
+    await roomRef.child("players/"+user.uid).update({bid:0,passed:true});
+    say("You passed this round.");
+    if(isHost)setTimeout(resolveRound,100);
+  }catch(e){say("Could not pass: "+e.message)}
+}
 
-  let found = -1;
-  for (let offset = 0; offset < players.length; offset++) {
-    const i = (turnIndex + offset) % players.length;
-    if (eligible(i)) {
-      found = i;
-      break;
+function startTimer(){
+  stopTimer();
+  const tick=()=>{
+    if(!roomData||roomData.status!=="auction")return stopTimer();
+    const seconds=Math.max(0,Math.ceil((Number(roomData.endsAt||0)-Date.now())/1000));
+    $("timer").textContent=seconds+"s";
+    if(seconds===0&&isHost)resolveRound();
+  };
+  tick();
+  timer=setInterval(tick,500);
+}
+function stopTimer(){if(timer)clearInterval(timer);timer=null}
+
+async function resolveRound(){
+  if(resolving||!isHost||!roomData||roomData.status!=="auction")return;
+  const current=players();
+  const everyonePassed=current.every(([id,p])=>p.passed);
+  const timeUp=Date.now()>=Number(roomData.endsAt||0);
+  if(!everyonePassed&&!timeUp)return;
+
+  resolving=true;
+  try{
+    const snap=await roomRef.get();
+    const fresh=snap.val();
+    if(!fresh||fresh.status!=="auction")return;
+
+    const eligible=Object.entries(fresh.players||{})
+      .filter(([id,p])=>!p.passed&&Number(p.bid)>0&&Number(p.bid)<=Number(p.budget))
+      .sort((a,b)=>Number(b[1].bid)-Number(a[1].bid));
+
+    const updates={status:"results"};
+    let result="No valid bids. Nobody won this movie.";
+
+    if(eligible.length){
+      const highest=Number(eligible[0][1].bid);
+      const tied=eligible.filter(([id,p])=>Number(p.bid)===highest);
+      if(tied.length>1){
+        result="Tie between "+tied.map(([id,p])=>p.name).join(", ")+". No winner this round.";
+      }else{
+        const [winnerId,winner]=tied[0];
+        updates["players/"+winnerId+"/budget"]=Number(winner.budget)-highest;
+        updates["players/"+winnerId+"/moviesWon"]=Number(winner.moviesWon||0)+1;
+        result=winner.name+" won "+fresh.currentMovie.name+" with a bid of "+highest+".";
+      }
     }
-  }
-
-  if (found === -1) {
-    if (highBidder >= 0) resolveAuction(false);
-    else resolveAuction(false);
-    return;
-  }
-
-  turnIndex = found;
-  $("turnStatus").textContent = players[turnIndex].name +
-    "'s turn. Bid " + money(currentBid + BID_STEP) + " or pass.";
-  $("bidButton").textContent = "BID + ₹5 CRORE";
-  $("bidButton").disabled =
-    players[turnIndex].budget < currentBid + BID_STEP;
+    updates.lastResult=result;
+    await roomRef.update(updates);
+  }catch(e){say("Could not resolve round: "+e.message)}
+  finally{resolving=false}
 }
 
-function placeBid() {
-  if (gameOver || turnIndex < 0) return;
-  const amount = currentBid + BID_STEP;
-  const bidder = players[turnIndex];
-
-  if (bidder.budget < amount) {
-    alert("This player does not have enough budget to bid.");
-    return;
-  }
-
-  currentBid = amount;
-  highBidder = turnIndex;
-  $("highestBid").textContent = money(currentBid);
-  $("leadingBidder").textContent = bidder.name;
-
-  turnIndex = (turnIndex + 1) % players.length;
-  updateTurn();
+async function finishGame(){
+  if(!isHost)return;
+  try{await roomRef.update({status:"finished"})}
+  catch(e){say("Could not finish: "+e.message)}
 }
 
-function passTurn() {
-  if (gameOver || turnIndex < 0) return;
-  passed.add(turnIndex);
-  const name = players[turnIndex].name;
-  turnIndex = (turnIndex + 1) % players.length;
-
-  if (highBidder >= 0) {
-    $("turnStatus").textContent = name + " passed. Current leader: " +
-      players[highBidder].name + ".";
-  } else {
-    $("turnStatus").textContent = name + " passed.";
-  }
-  updateTurn();
+async function playAgain(){
+  if(!isHost||!roomData)return;
+  const updates={status:"lobby",round:0,currentMovie:null,endsAt:null,lastResult:""};
+  players().forEach(([id])=>{
+    updates["players/"+id+"/budget"]=Number(roomData.startingBudget);
+    updates["players/"+id+"/score"]=0;
+    updates["players/"+id+"/bid"]=0;
+    updates["players/"+id+"/passed"]=false;
+    updates["players/"+id+"/moviesWon"]=0;
+  });
+  try{await roomRef.update(updates)}
+  catch(e){say("Could not reset the game: "+e.message)}
 }
 
-function resolveAuction(fromTimer) {
-  if (gameOver || $("nextButton").classList.contains("hidden") === false) return;
+function leaveRoom(){
   stopTimer();
-
-  if (highBidder >= 0) {
-    const winner = players[highBidder];
-    winner.budget -= currentBid;
-    winner.spent += currentBid;
-    winner.total += currentMovie.collection;
-    winner.movies.push(currentMovie);
-
-    $("turnStatus").className = "status";
-    $("turnStatus").textContent =
-      "🏆 " + winner.name + " won " + currentMovie.title +
-      " for " + money(currentBid) + "! Collection score: " +
-      money(currentMovie.collection) + "." +
-      (fromTimer ? " Time ran out." : "");
-  } else {
-    $("turnStatus").className = "status warning";
-    $("turnStatus").textContent =
-      currentMovie.title + " received no bids and is skipped.";
-  }
-
-  $("bidButton").classList.add("hidden");
-  $("passButton").classList.add("hidden");
-  $("nextButton").classList.remove("hidden");
-  renderScores();
+  if(listener&&roomRef)roomRef.off("value",listener);
+  listener=null;roomRef=null;roomData=null;roomCode="";isHost=false;
+  screen("home");
+  say("You left the room.");
 }
 
-function renderScores() {
-  const sorted = players.map((p, i) => ({...p, originalIndex:i}))
-    .sort((a,b) => b.total - a.total);
-
-  $("scoreboard").innerHTML = sorted.map((p, rank) =>
-    '<article class="player-card '+(rank === 0 ? "leader" : "")+'">' +
-      '<div class="player-name">'+(rank === 0 ? "👑 " : "")+
-        safe(p.name)+'</div>' +
-      '<div class="player-score">'+money(p.total)+'</div>' +
-      '<div class="player-meta">Rank: '+(rank+1)+
-        ' · Budget left: '+money(p.budget)+
-        '<br>Spent: '+money(p.spent)+
-        '<br>Movies won: '+p.movies.length+'</div>' +
-      (p.movies.length
-        ? '<ul class="movie-list">'+p.movies.map(m =>
-            '<li>'+safe(m.title)+'</li>').join("")+'</ul>'
-        : '<p class="small">No movies won yet</p>') +
-    '</article>'
-  ).join("");
-
-  $("moviesLeft").textContent = "Movies remaining: " + remainingMovies.length;
-}
-
-function finishGame() {
-  stopTimer();
-  gameOver = true;
-  $("game").classList.add("hidden");
-  $("finalScreen").classList.remove("hidden");
-
-  const sorted = [...players].sort((a,b) => b.total - a.total);
-  const topScore = sorted[0].total;
-  const winners = sorted.filter(p => p.total === topScore);
-
-  $("winnerText").textContent = winners.length > 1
-    ? "🤝 It's a tie! " + winners.map(p => p.name).join(" and ") +
-      " finish with " + money(topScore) + " in movie collections."
-    : "🎉 " + winners[0].name + " is the Box Office Battle champion with " +
-      money(topScore) + " in movie collections!";
-
-  $("finalScores").innerHTML = sorted.map((p, i) =>
-    '<article class="player-card '+(p.total === topScore ? "leader" : "")+'">' +
-      '<div class="player-name">'+(i === 0 ? "🏆 " : "")+safe(p.name)+'</div>' +
-      '<div class="player-score">'+money(p.total)+'</div>' +
-      '<div class="player-meta">Budget remaining: '+money(p.budget)+
-      '<br>Movies won: '+p.movies.length+'</div>' +
-      (p.movies.length ? '<ul class="movie-list">'+p.movies.map(m =>
-        '<li>'+safe(m.title)+' — '+money(m.collection)+'</li>'
-      ).join("")+'</ul>' : '') +
-    '</article>'
-  ).join("");
-}
+$("createBtn").addEventListener("click",createRoom);
+$("joinBtn").addEventListener("click",joinRoom);
+$("startBtn").addEventListener("click",startRound);
+$("bidBtn").addEventListener("click",submitBid);
+$("passBtn").addEventListener("click",passRound);
+$("nextBtn").addEventListener("click",()=>{
+  if(Number(roomData?.round)>=Number(roomData?.movieCount))finishGame();
+  else startRound();
+});
+$("finishBtn").addEventListener("click",finishGame);
+$("playAgainBtn").addEventListener("click",playAgain);
+$("leaveBtn").addEventListener("click",leaveRoom);
+$("copyBtn").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(roomCode);say("Room code copied: "+roomCode)}
+  catch(e){say("Share this room code: "+roomCode)}
+});
 </script>
 </body>
 </html>
