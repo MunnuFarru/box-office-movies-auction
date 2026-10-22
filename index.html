@@ -482,17 +482,12 @@ async function passRound(){
 }
 
 
+
 function startTimer(){
   stopTimer();
-  const tick=()=>{
-    if(!roomData||roomData.status!=="auction")return stopTimer();
-    const seconds=Math.max(0,Math.ceil((Number(roomData.endsAt||0)-Date.now())/1000));
-    $("timer").textContent=seconds+"s";
-    if(seconds===0&&isHost)resolveRound();
-  };
-  tick();
-  timer=setInterval(tick,500);
+  $("timer").textContent = "No time limit";
 }
+
 function stopTimer(){if(timer)clearInterval(timer);timer=null}
 
 
