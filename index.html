@@ -211,7 +211,7 @@ const movies=[
 ];
 
  
-const TMDB_API_KEY = "PASTE_YOUR_V3_API_KEY_HERE";
+const TMDB_API_KEY = "4fe6efa604f929bf22f01075106b0a20";
 const tmdbPosterCache = {};
 
 async function loadMoviePoster(movie) {
@@ -348,6 +348,7 @@ function render(){
  if(player){$("myBudget").textContent=fmt(player.budget);$("myScore").textContent=String(player.moviesWon||0);$("bidStatus").textContent=player.passed?"You passed this movie.":Number(player.bid)>0?"Your current bid: "+fmt(player.bid):"No bid submitted yet.";}
  $("roundNumber").textContent=(roomData.round||0)+"/"+(roomData.movieCount||0);
  const movie=roomData.currentMovie;
+ loadMoviePoster(movie);
  $("movieName").textContent=movie?.name||"Game finished";
  $("movieDetails").textContent=movie?movie.year+" · Hero: "+movie.hero+" · Heroine: "+movie.heroine+" · Director: "+movie.director:"";
  $("movieBadges").innerHTML=movie?badgeHTML(movie):"";
