@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Box Office Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f4f9;
+      padding: 30px 15px;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px #cccccc;
+    }
+    h1 { color: #6c3ce9; }
+    input, button {
+      padding: 12px;
+      margin: 8px 0;
+      width: 90%;
+      max-width: 350px;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+    input { border: 1px solid #ccc; }
+    button {
+      background: #6c3ce9;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { background: #5125bb; }
+    #result {
+      margin-top: 20px;
+      font-weight: bold;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎬 Box Office Game</h1>
+    <p>Enter a movie name and its box office collection.</p>
+
+    <input id="movie" type="text" placeholder="Enter movie name">
+    <input id="collection" type="number" placeholder="Collection in crores">
+
+    <button onclick="addMovie()">Add Movie</button>
+    <button onclick="declareWinner()">Declare Winner</button>
+
+    <div id="result"></div>
+    <ol id="movieList"></ol>
+  </div>
+
+  <script>
+    const movies = [];
+
+    function addMovie() {
+      const name = document.getElementById("movie").value.trim();
+      const collection = Number(document.getElementById("collection").value);
+
+      if (!name || document.getElementById("collection").value === "" ||
+          !Number.isFinite(collection) || collection < 0) {
+        alert("Please enter a movie name and a valid collection.");
+        return;
+      }
+
+      movies.push({ name, collection });
+      showMovies();
+
+      document.getElementById("movie").value = "";
+      document.getElementById("collection").value = "";
+    }
+
+    function showMovies() {
+      const list = document.getElementById("movieList");
+      list.replaceChildren();
+
+      movies.forEach(movie => {
+        const item = document.createElement("li");
+        item.textContent = movie.name + " — ₹" + movie.collection + " crore";
+        list.appendChild(item);
+      });
+    }
+
+    function declareWinner() {
+      const result = document.getElementById("result");
+
+      if (movies.length === 0) {
+        result.textContent = "Please add at least one movie first!";
+        return;
+      }
+
+      const highest = Math.max(...movies.map(movie => movie.collection));
+      const winners = movies.filter(movie => movie.collection === highest);
+
+      result.textContent = winners.length === 1
+        ? "🏆 Winner: " + winners[0].name + " — ₹" + highest + " crore!"
+        : "🤝 It's a tie! " + winners.map(movie => movie.name).join(", ") +
+          " — ₹" + highest + " crore each!";
+    }
+  </script>
+</body>
+</html>
