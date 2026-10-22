@@ -340,12 +340,20 @@ async function loadMoviePoster(movie) {
   }
 }
 
-async function fetchTeluguMovies(startYear) {
+
+async function fetchTeluguMovies(startYear, requestedCount) {
   const currentYear = new Date().getFullYear();
   const allMovies = [];
   const seenIds = new Set();
+  let totalPages = 1;
 
-  for (let page = 1; page <= 5; page++) {
+  for (
+    let page = 1;
+    page <= totalPages &&
+    page <= 500 &&
+    allMovies.length < requestedCount;
+    page++
+  ) {
     const url = new URL(
       "https://api.themoviedb.org/3/discover/movie"
     );
@@ -367,19 +375,20 @@ async function fetchTeluguMovies(startYear) {
     const response = await fetch(url);
 
     if (!response.ok) {
-      throw new Error("Could not fetch Telugu movies from TMDB.");
+      throw new Error("TMDB could not load movies. Please try again.");
     }
 
     const data = await response.json();
+    totalPages = Math.min(data.total_pages || 1, 500);
 
     for (const item of data.results || []) {
       if (!item.id || seenIds.has(item.id)) continue;
 
       const year = Number(item.release_date?.slice(0, 4));
+
       if (!year || year < startYear || year > currentYear) continue;
 
       seenIds.add(item.id);
-
       allMovies.push({
         tmdbId: item.id,
         name: item.title,
@@ -389,13 +398,16 @@ async function fetchTeluguMovies(startYear) {
         director: "",
         tags: []
       });
-    }
 
-    if (page >= (data.total_pages || 1)) break;
+      if (allMovies.length >= requestedCount) break;
+    }
   }
 
-  if (!allMovies.length) {
-    throw new Error("No Telugu movies found for that year range.");
+  if (allMovies.length < requestedCount) {
+    throw new Error(
+      "Only " + allMovies.length +
+      " matching Telugu movies were found. Please choose a smaller number."
+    );
   }
 
   return allMovies;
