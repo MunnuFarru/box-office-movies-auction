@@ -175,3 +175,1045 @@ footer{text-align:center;color:#8f849f;font-size:.8rem;padding:12px}
 </main>
 <footer>Movie information and posters are supplied by TMDB. This fan-made game is not affiliated with TMDB or any film studio.</footer>
 </div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
+<script>
+"use strict";
+
+/* STEP 1: Replace these placeholders with your own settings. */
+const firebaseConfig = {
+  apiKey: "AIzaSyB8QrdF4pxxBX8l-WIW_km_nWt_jiHyaXg",
+  authDomain: "box-office-game-37cd0.firebaseapp.com",
+  databaseURL: "https://box-office-game-37cd0-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "box-office-game-37cd0",
+  storageBucket: "box-office-game-37cd0.firebasestorage.app",
+  messagingSenderId: "38817152052",
+  appId: "1:38817152052:web:4cbe74b3d0c17e99071e61"
+};
+
+const TMDB_API_KEY = "4fe6efa604f929bf22f01075106b0a20";
+
+let auth = null;
+let db = null;
+let currentUser = null;
+let currentRoomCode = null;
+let roomRef = null;
+let roomData = null;
+let movies = [];
+let movieCache = [];
+let unsubscribeRoom = null;
+let resolvingRound = false;
+
+const $ = id => document.getElementById(id);
+
+function showMessage(id, message, type = "") {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = message;
+  el.className = "notice" + (type ? " " + type : "");
+  el.classList.remove("hidden");
+}
+
+function hideMessage(id) {
+  const el = $(id);
+  if (el) el.classList.add("hidden");
+}
+
+function showScreen(name) {
+  ["homeScreen", "lobbyScreen", "gameScreen"].forEach(id => {
+    $(id).classList.toggle("hidden", id !== name);
+  });
+}
+
+function money(value) {
+  return "₹" + Number(value || 0).toLocaleString("en-IN");
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[ch]);
+}
+
+function randomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+
+function isConfigured() {
+  return firebaseConfig.apiKey !== "PASTE_YOUR_FIREBASE_API_KEY_HERE"
+    && firebaseConfig.projectId !== "PASTE_YOUR_PROJECT_ID"
+    && firebaseConfig.databaseURL.indexOf("PASTE_YOUR") === -1
+    && TMDB_API_KEY !== "PASTE_YOUR_TMDB_V3_API_KEY_HERE";
+}
+
+async function api(path) {
+  if (!TMDB_API_KEY || TMDB_API_KEY.startsWith("PASTE_YOUR")) {
+    throw new Error("Please add your TMDB API key in the code.");
+  }
+
+  const separator = path.includes("?") ? "&" : "?";
+  const url = "https://api.themoviedb.org/3/" + path
+    + separator + "api_key=" + encodeURIComponent(TMDB_API_KEY);
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("TMDB request failed (" + response.status + "). Check your API key.");
+  }
+  return response.json();
+}
+
+async function fetchTeluguMovies() {
+  const year = Number($("movieStartYear").value) || 1980;
+  const seen = new Set();
+  const results = [];
+
+  for (let page = 1; page <= 5; page++) {
+    const data = await api(
+      "discover/movie?with_original_language=te"
+      + "&sort_by=popularity.desc"
+      + "&vote_count.gte=3"
+      + "&primary_release_date.gte=" + year + "-01-01"
+      + "&page=" + page
+    );
+
+    (data.results || []).forEach(movie => {
+      if (!movie.id || seen.has(movie.id)) return;
+      seen.add(movie.id);
+      results.push(movie);
+    });
+
+    if (results.length >= 100) break;
+  }
+
+  if (!results.length) {
+    throw new Error("No Telugu movies found for this year. Try an earlier year.");
+  }
+
+  return results;
+}
+
+async function getMovieDetails(movie) {
+  try {
+    const details = await api("movie/" + movie.id + "?language=en-US");
+    return {
+      id: movie.id,
+      title: details.title || movie.title || "Unknown movie",
+      year: (details.release_date || "").slice(0, 4) || "Unknown",
+      poster: details.poster_path
+        ? "https://image.tmdb.org/t/p/w500" + details.poster_path
+        : "",
+      overview: details.overview || "No description available.",
+      genres: (details.genres || []).map(g => g.name),
+      rating: Number(details.vote_average || 0).toFixed(1),
+      budget: Number(details.budget || 0),
+      revenue: Number(details.revenue || 0)
+    };
+  } catch (error) {
+    return {
+      id: movie.id,
+      title: movie.title || "Unknown movie",
+      year: (movie.release_date || "").slice(0, 4) || "Unknown",
+      poster: movie.poster_path
+        ? "https://image.tmdb.org/t/p/w500" + movie.poster_path
+        : "",
+      overview: movie.overview || "No description available.",
+      genres: [],
+      rating: Number(movie.vote_average || 0).toFixed(1),
+      budget: 0,
+      revenue: 0
+    };
+  }
+}
+
+async function prepareQueue() {
+  const selection = $("selectionMode").value;
+  let catalogue = await fetchTeluguMovies();
+
+  if (selection === "manual") {
+    const person = $("personName").value.trim();
+    if (!person) throw new Error("Enter a hero, heroine, or director name.");
+
+    const people = await api(
+      "search/person?query=" + encodeURIComponent(person)
+    );
+
+    if (!people.results || !people.results.length) {
+      throw new Error("Person not found. Check the spelling and try again.");
+    }
+
+    const personId = people.results[0].id;
+    const type = $("personType").value;
+    const matching = [];
+
+    for (let page = 1; page <= 3; page++) {
+      const credits = await api(
+        "person/" + personId + "/movie_credits?language=en-US"
+      );
+
+      const cast = credits.cast || [];
+      const crew = credits.crew || [];
+
+      const list = type === "director"
+        ? crew.filter(item => item.job === "Director")
+        : cast;
+
+      list.forEach(item => {
+        if (
+          item.original_language === "te" ||
+          (catalogue.some(m => m.id === item.id))
+        ) {
+          matching.push(item);
+        }
+      });
+
+      break;
+    }
+
+    const allowed = new Set(matching.map(m => m.id));
+    catalogue = catalogue.filter(m => allowed.has(m.id));
+
+    if (!catalogue.length) {
+      throw new Error("No matching Telugu movies found for this person.");
+    }
+  }
+
+  const wanted = Math.min(
+    Math.max(Number($("movieCount").value) || 7, 1),
+    15
+  );
+
+  // Randomize the available catalogue so each game feels different.
+  catalogue = catalogue.sort(() => Math.random() - 0.5);
+  const selected = catalogue.slice(0, Math.min(50, catalogue.length));
+
+  movieCache = await Promise.all(
+    selected.slice(0, Math.max(wanted * 2, 20)).map(getMovieDetails)
+  );
+
+  if (!movieCache.length) {
+    throw new Error("Could not load movies. Please try again.");
+  }
+
+  movieCache.sort(() => Math.random() - 0.5);
+  movies = movieCache.slice(0, Math.min(wanted, movieCache.length));
+
+  return movies;
+}
+
+function setConnection(text, online = false) {
+  $("connectionStatus").textContent = text;
+  $("connectionStatus").classList.toggle("online", online);
+}
+
+function getPlayerName() {
+  return $("playerName").value.trim().slice(0, 20);
+}
+
+function makePlayer(name, budget) {
+  return {
+    uid: currentUser.uid,
+    name: name,
+    budget: Number(budget),
+    movies: [],
+    bid: 0,
+    passed: false,
+    connected: true
+  };
+}
+
+function stopRoomListener() {
+  if (unsubscribeRoom) {
+    unsubscribeRoom();
+    unsubscribeRoom = null;
+  }
+}
+
+function listenRoom(code) {
+  stopRoomListener();
+
+  currentRoomCode = code;
+  roomRef = db.ref("rooms/" + code);
+
+  const callback = snapshot => {
+    if (!snapshot.exists()) {
+      showMessage("homeMessage", "This room no longer exists.", "error");
+      showScreen("homeScreen");
+      return;
+    }
+
+    roomData = snapshot.val();
+
+    if (roomData.status === "lobby") {
+      showScreen("lobbyScreen");
+      renderLobby();
+    } else {
+      showScreen("gameScreen");
+      renderGame();
+    }
+  };
+
+  roomRef.on("value", callback);
+  unsubscribeRoom = () => roomRef.off("value", callback);
+}
+
+async function createRoom() {
+  hideMessage("homeMessage");
+
+  if (!auth || !db || !currentUser) {
+    showMessage("homeMessage", "Firebase is not ready. Check your configuration.", "error");
+    return;
+  }
+
+  const name = getPlayerName();
+  const budget = Number($("startingBudget").value);
+
+  if (!name) {
+    showMessage("homeMessage", "Please enter your player name.");
+    return;
+  }
+  if (!Number.isFinite(budget) || budget < 1) {
+    showMessage("homeMessage", "Enter a valid starting budget.");
+    return;
+  }
+
+  $("createBtn").disabled = true;
+  $("createBtn").textContent = "Preparing game…";
+
+  try {
+    showMessage("homeMessage", "Loading Telugu movies…");
+    const queue = await prepareQueue();
+
+    const settings = {
+      budget: budget,
+      movieCount: queue.length,
+      startingYear: Number($("movieStartYear").value) || 1980,
+      selectionMode: $("selectionMode").value,
+      personName: $("personName").value.trim()
+    };
+
+    let code = randomCode();
+    let ref = db.ref("rooms/" + code);
+    let snapshot = await ref.get();
+
+    while (snapshot.exists()) {
+      code = randomCode();
+      ref = db.ref("rooms/" + code);
+      snapshot = await ref.get();
+    }
+
+    const initialRoom = {
+      code: code,
+      hostUid: currentUser.uid,
+      status: "lobby",
+      settings: settings,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      players: {},
+      queue: queue,
+      roundIndex: 0,
+      currentMovie: null,
+      highestBidUid: null,
+      highestBid: 0,
+      roundResult: null,
+      leaderboard: null
+    };
+
+    initialRoom.players[currentUser.uid] = makePlayer(name, budget);
+
+    await ref.set(initialRoom);
+    listenRoom(code);
+    showMessage("lobbyMessage", "Room created! Share the code with your friends.", "success");
+  } catch (error) {
+    showMessage("homeMessage", error.message || "Could not create the room.", "error");
+  } finally {
+    $("createBtn").disabled = false;
+    $("createBtn").textContent = "Create a room";
+  }
+}
+
+async function joinRoom() {
+  hideMessage("homeMessage");
+
+  if (!db || !currentUser) {
+    showMessage("homeMessage", "Firebase is not ready. Check your configuration.", "error");
+    return;
+  }
+
+  const name = getPlayerName();
+  const code = $("roomInput").value.trim().toUpperCase();
+
+  if (!name) {
+    showMessage("homeMessage", "Please enter your player name first.");
+    return;
+  }
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    showMessage("homeMessage", "Enter a valid six-character room code.");
+    return;
+  }
+
+  $("joinBtn").disabled = true;
+  $("joinBtn").textContent = "Joining…";
+
+  try {
+    const ref = db.ref("rooms/" + code);
+    const snapshot = await ref.get();
+
+    if (!snapshot.exists()) throw new Error("Room not found. Check the code.");
+    const room = snapshot.val();
+
+    if (room.status !== "lobby") {
+      throw new Error("This game has already started.");
+    }
+
+    const players = room.players || {};
+    if (!players[currentUser.uid] && Object.keys(players).length >= 8) {
+      throw new Error("This room is full. Maximum 8 players.");
+    }
+
+    const budget = Number(room.settings && room.settings.budget) || 10000;
+
+    await ref.child("players/" + currentUser.uid).set(
+      makePlayer(name, budget)
+    );
+
+    listenRoom(code);
+    showMessage("lobbyMessage", "You joined the room successfully!", "success");
+  } catch (error) {
+    showMessage("homeMessage", error.message || "Could not join the room.", "error");
+  } finally {
+    $("joinBtn").disabled = false;
+    $("joinBtn").textContent = "Join room";
+  }
+}
+</script>
+
+<script>
+function playerList() {
+  return Object.values((roomData && roomData.players) || {});
+}
+
+function isHost() {
+  return !!roomData && !!currentUser &&
+    roomData.hostUid === currentUser.uid;
+}
+
+function renderLobby() {
+  if (!roomData) return;
+
+  $("roomCodeDisplay").textContent = currentRoomCode;
+  $("playerCount").textContent =
+    Object.keys(roomData.players || {}).length + "/8";
+
+  const settings = roomData.settings || {};
+  $("settingsSummary").textContent =
+    "Budget: " + money(settings.budget) +
+    " per player • " + settings.movieCount +
+    " movies • From " + settings.startingYear;
+
+  const players = Object.values(roomData.players || {});
+  $("lobbyPlayers").innerHTML = players.map((p, index) => `
+    <div class="player">
+      <div>
+        <strong>${escapeHTML(p.name)}</strong>
+        <small>${p.uid === roomData.hostUid ? "Host" : "Player " + (index + 1)}</small>
+      </div>
+      <span class="pill">${p.uid === roomData.hostUid ? "HOST" : "READY"}</span>
+    </div>
+  `).join("");
+
+  const ready = players.length >= 2;
+  $("startBtn").disabled = !isHost() || !ready;
+  $("startBtn").textContent = !isHost()
+    ? "Waiting for host to start"
+    : ready ? "Start the game" : "Waiting for another player…";
+}
+
+async function startGame() {
+  if (!roomRef || !roomData || !isHost()) return;
+
+  const players = roomData.players || {};
+  if (Object.keys(players).length < 2) {
+    showMessage("lobbyMessage", "At least 2 players are needed.");
+    return;
+  }
+
+  if (!roomData.queue || !roomData.queue.length) {
+    showMessage("lobbyMessage", "No movies are available. Create a new room.");
+    return;
+  }
+
+  $("startBtn").disabled = true;
+
+  try {
+    const updates = {
+      status: "playing",
+      roundIndex: 0,
+      currentMovie: roomData.queue[0],
+      highestBid: 0,
+      highestBidUid: null,
+      roundResult: null
+    };
+
+    Object.keys(players).forEach(uid => {
+      updates["players/" + uid + "/bid"] = 0;
+      updates["players/" + uid + "/passed"] = false;
+      updates["players/" + uid + "/movies"] = [];
+      updates["players/" + uid + "/budget"] =
+        Number(roomData.settings.budget) || 10000;
+    });
+
+    await roomRef.update(updates);
+  } catch (error) {
+    showMessage("lobbyMessage", "Could not start the game: " + error.message, "error");
+  } finally {
+    $("startBtn").disabled = false;
+  }
+}
+
+function currentPlayer() {
+  return roomData && roomData.players
+    ? roomData.players[currentUser.uid]
+    : null;
+}
+
+function activePlayers() {
+  return playerList().filter(p => !p.passed);
+}
+
+function renderGame() {
+  if (!roomData) return;
+
+  $("gameRoomCode").textContent = currentRoomCode;
+
+  const settings = roomData.settings || {};
+  const queue = roomData.queue || [];
+  const index = Number(roomData.roundIndex || 0);
+  const total = Number(settings.movieCount || queue.length || 0);
+
+  $("roundNumber").textContent =
+    "Round " + Math.min(index + 1, total) + "/" + total;
+
+  const me = currentPlayer();
+  $("myBudget").textContent = money(me ? me.budget : 0);
+  $("myScore").textContent = me && me.movies ? me.movies.length : 0;
+
+  if (me && me.passed) {
+    $("bidStatus").textContent = "Passed";
+  } else if (me && Number(me.bid) > 0) {
+    $("bidStatus").textContent = money(me.bid);
+  } else {
+    $("bidStatus").textContent = "Waiting";
+  }
+
+  const movie = roomData.currentMovie;
+
+  if (movie) {
+    $("movieName").textContent = movie.title || "Unknown movie";
+    $("movieDetails").textContent =
+      (movie.year || "Year unknown") +
+      " • TMDB rating: " + (movie.rating || "N/A") +
+      (movie.genres && movie.genres.length
+        ? " • " + movie.genres.join(", ")
+        : "");
+
+    $("movieBadges").innerHTML =
+      '<span class="pill gold">TELUGU MOVIE</span>' +
+      (movie.poster ? "" : '<span class="pill">Poster unavailable</span>');
+
+    const poster = $("moviePoster");
+    if (movie.poster) {
+      poster.src = movie.poster;
+      poster.alt = movie.title + " poster";
+      poster.classList.remove("hidden");
+    } else {
+      poster.removeAttribute("src");
+      poster.classList.add("hidden");
+    }
+  } else {
+    $("movieName").textContent = "Waiting for the next movie…";
+    $("movieDetails").textContent = "";
+    $("moviePoster").classList.add("hidden");
+    $("movieBadges").innerHTML = "";
+  }
+
+  const highestBid = Number(roomData.highestBid || 0);
+  const highBidder = roomData.highestBidUid
+    ? roomData.players[roomData.highestBidUid]
+    : null;
+
+  $("highBidInfo").textContent = highestBid > 0 && highBidder
+    ? "Highest bid: " + money(highestBid) + " — " + highBidder.name
+    : "No bids yet — be the first!";
+
+  const canBid = roomData.status === "playing" &&
+    me && !me.passed && !!movie;
+
+  $("bidAmount").disabled = !canBid;
+  $("bidBtn").disabled = !canBid;
+  $("passBtn").disabled = !canBid;
+
+  const players = playerList();
+
+  $("gamePlayers").innerHTML = players.map(p => {
+    const isHighest = p.uid === roomData.highestBidUid &&
+      Number(roomData.highestBid) > 0;
+
+    let status = p.passed ? "Passed this movie" :
+      Number(p.bid) > 0 ? "Bid " + money(p.bid) : "No bid yet";
+
+    if (isHighest) status = "Highest bidder • " + money(p.bid);
+
+    return `
+      <div class="player">
+        <div>
+          <strong>${escapeHTML(p.name)}${p.uid === currentUser.uid ? " (You)" : ""}</strong>
+          <small>${escapeHTML(status)}</small>
+        </div>
+        <div class="player-right">
+          <strong>${money(p.budget)}</strong>
+          <small>${(p.movies || []).length} movies</small>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const result = roomData.roundResult;
+  $("resultCard").classList.toggle("hidden", !result);
+  if (result) {
+    $("roundResult").textContent = result.winnerName
+      ? result.winnerName + " won the movie!"
+      : "No winner this round";
+    $("resultReason").textContent = result.winnerName
+      ? result.movieTitle + " was sold for " + money(result.amount) + "."
+      : result.movieTitle + " received no valid bids.";
+    $("nextRoundMessage").textContent =
+      isHost() ? "The next round will begin automatically." :
+      "Waiting for the host to continue…";
+  }
+
+  const finished = roomData.status === "finished";
+  $("finalCard").classList.toggle("hidden", !finished);
+
+  if (finished) renderLeaderboard();
+
+  if (roomData.status === "finished") {
+    $("bidForm").classList.add("hidden");
+    $("passBtn").classList.add("hidden");
+  } else {
+    $("bidForm").classList.remove("hidden");
+    $("passBtn").classList.remove("hidden");
+  }
+
+  if (roomData.status === "playing") {
+    hideMessage("gameMessage");
+  }
+}
+
+function renderLeaderboard() {
+  const players = playerList().sort((a, b) => {
+    const movieDiff = (b.movies || []).length - (a.movies || []).length;
+    if (movieDiff) return movieDiff;
+    return Number(b.budget || 0) - Number(a.budget || 0);
+  });
+
+  $("leaderboard").innerHTML = players.map((p, i) => `
+    <div class="player">
+      <div>
+        <strong>${["🥇", "🥈", "🥉"][i] || (i + 1) + "."} ${escapeHTML(p.name)}</strong>
+        <small>${(p.movies || []).length} movies collected</small>
+      </div>
+      <div class="player-right">
+        <strong>${money(p.budget)}</strong>
+        <small>Remaining budget</small>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function submitBid(event) {
+  event.preventDefault();
+
+  if (!roomRef || !roomData || roomData.status !== "playing") return;
+
+  const me = currentPlayer();
+  const amount = Number($("bidAmount").value);
+  const highest = Number(roomData.highestBid || 0);
+
+  if (!me || me.passed) {
+    showMessage("gameMessage", "You have already passed this movie.", "error");
+    return;
+  }
+
+  if (!Number.isSafeInteger(amount) || amount < 1) {
+    showMessage("gameMessage", "Enter a valid whole-number bid.", "error");
+    return;
+  }
+
+  if (amount <= highest) {
+    showMessage("gameMessage", "Your bid must be higher than " + money(highest) + ".", "error");
+    return;
+  }
+
+  if (amount > Number(me.budget)) {
+    showMessage("gameMessage", "Your bid is higher than your remaining budget.", "error");
+    return;
+  }
+
+  try {
+    const snapshot = await roomRef.get();
+    const latest = snapshot.val();
+
+    if (!latest || latest.status !== "playing") {
+      throw new Error("This auction round has ended.");
+    }
+
+    const latestPlayer = latest.players[currentUser.uid];
+    if (!latestPlayer || latestPlayer.passed) {
+      throw new Error("You can no longer bid in this round.");
+    }
+
+    if (amount <= Number(latest.highestBid || 0)) {
+      throw new Error("Someone placed a higher bid. Please bid again.");
+    }
+
+    if (amount > Number(latestPlayer.budget)) {
+      throw new Error("Your bid exceeds your remaining budget.");
+    }
+
+    await roomRef.update({
+      highestBid: amount,
+      highestBidUid: currentUser.uid,
+      ["players/" + currentUser.uid + "/bid"]: amount
+    });
+
+    $("bidAmount").value = "";
+    showMessage("gameMessage", "Your bid of " + money(amount) + " has been placed.", "success");
+  } catch (error) {
+    showMessage("gameMessage", error.message || "Could not place bid.", "error");
+  }
+}
+
+async function passRound() {
+  if (!roomRef || !roomData || roomData.status !== "playing") return;
+
+  const me = currentPlayer();
+  if (!me || me.passed) return;
+
+  try {
+    const updates = {};
+    updates["players/" + currentUser.uid + "/passed"] = true;
+    await roomRef.update(updates);
+
+    showMessage("gameMessage", "You passed this movie.", "success");
+    await maybeAutoResolve();
+  } catch (error) {
+    showMessage("gameMessage", error.message || "Could not pass.", "error");
+  }
+}
+
+async function maybeAutoResolve() {
+  if (!roomRef || !roomData || !isHost() ||
+      roomData.status !== "playing" || resolvingRound) return;
+
+  const active = activePlayers();
+
+  if (active.length === 0) {
+    await resolveRound();
+    return;
+  }
+
+  // If the highest bidder is the only player who has not passed,
+  // the auction can end immediately.
+  if (active.length === 1 &&
+      Number(roomData.highestBid || 0) > 0 &&
+      active[0].uid === roomData.highestBidUid) {
+    await resolveRound();
+  }
+}
+
+async function resolveRound() {
+  if (!roomRef || !roomData || !isHost() ||
+      roomData.status !== "playing" || resolvingRound) return;
+
+  resolvingRound = true;
+
+  try {
+    const snapshot = await roomRef.get();
+    const latest = snapshot.val();
+
+    if (!latest || latest.status !== "playing") return;
+
+    const players = latest.players || {};
+    const bid = Number(latest.highestBid || 0);
+    const bidderUid = latest.highestBidUid;
+    const movie = latest.currentMovie || {};
+
+    let winner = null;
+    let winnerName = null;
+    let amount = 0;
+
+    // A tie, invalid bid, or unavailable bidder means no winner.
+    const tied = Object.values(players).filter(p =>
+      Number(p.bid || 0) === bid && bid > 0 && !p.passed
+    ).length > 1;
+
+    if (bid > 0 && bidderUid && !tied && players[bidderUid]) {
+      const candidate = players[bidderUid];
+      if (!candidate.passed && bid <= Number(candidate.budget)) {
+        winner = candidate;
+        winnerName = candidate.name;
+        amount = bid;
+      }
+    }
+
+    const updates = {};
+    updates.status = "resolving";
+    updates.roundResult = {
+      movieTitle: movie.title || "Unknown movie",
+      winnerUid: winner ? winner.uid : null,
+      winnerName: winnerName,
+      amount: amount,
+      timestamp: Date.now()
+    };
+
+    if (winner) {
+      updates["players/" + winner.uid + "/budget"] =
+        Number(winner.budget) - amount;
+
+      const wonMovies = Array.isArray(winner.movies)
+        ? winner.movies.slice()
+        : [];
+      wonMovies.push({
+        id: movie.id,
+        title: movie.title,
+        year: movie.year,
+        poster: movie.poster,
+        price: amount
+      });
+
+      updates["players/" + winner.uid + "/movies"] = wonMovies;
+    }
+
+    await roomRef.update(updates);
+
+    const nextIndex = Number(latest.roundIndex || 0) + 1;
+    const queue = latest.queue || [];
+    const total = Math.min(
+      Number(latest.settings && latest.settings.movieCount) || queue.length,
+      queue.length
+    );
+
+    if (nextIndex >= total) {
+      const finalSnapshot = await roomRef.get();
+      const finalRoom = finalSnapshot.val();
+      const finalPlayers = finalRoom.players || {};
+
+      const finalUpdates = {
+        status: "finished",
+        roundIndex: nextIndex
+      };
+
+      await roomRef.update(finalUpdates);
+    } else {
+      // Give the result a moment to be seen, then prepare the next round.
+      setTimeout(async () => {
+        try {
+          const check = await roomRef.get();
+          const current = check.val();
+
+          if (!current || current.status !== "resolving") return;
+
+          const nextMovie = (current.queue || [])[nextIndex];
+          if (!nextMovie) {
+            await roomRef.update({
+              status: "finished",
+              roundIndex: nextIndex
+            });
+            return;
+          }
+
+          const updates = {
+            status: "playing",
+            roundIndex: nextIndex,
+            currentMovie: nextMovie,
+            highestBid: 0,
+            highestBidUid: null,
+            roundResult: null
+          };
+
+          Object.keys(current.players || {}).forEach(uid => {
+            updates["players/" + uid + "/bid"] = 0;
+            updates["players/" + uid + "/passed"] = false;
+          });
+
+          await roomRef.update(updates);
+        } catch (error) {
+          console.error("Next round error:", error);
+        }
+      }, 3500);
+    }
+  } catch (error) {
+    console.error("Resolve round error:", error);
+  } finally {
+    resolvingRound = false;
+  }
+}
+
+async function playAgain() {
+  if (!roomRef || !roomData || !isHost()) {
+    showMessage("gameMessage", "Only the host can restart the game.");
+    return;
+  }
+
+  try {
+    const settings = roomData.settings || {};
+    const queue = roomData.queue || [];
+
+    if (!queue.length) throw new Error("No movie list is available.");
+
+    const updates = {
+      status: "lobby",
+      roundIndex: 0,
+      currentMovie: null,
+      highestBid: 0,
+      highestBidUid: null,
+      roundResult: null,
+      leaderboard: null
+    };
+
+    Object.keys(roomData.players || {}).forEach(uid => {
+      updates["players/" + uid + "/budget"] = Number(settings.budget) || 10000;
+      updates["players/" + uid + "/movies"] = [];
+      updates["players/" + uid + "/bid"] = 0;
+      updates["players/" + uid + "/passed"] = false;
+    });
+
+    await roomRef.update(updates);
+  } catch (error) {
+    showMessage("gameMessage", error.message || "Could not restart the game.", "error");
+  }
+}
+
+async function leaveRoom() {
+  stopRoomListener();
+  roomRef = null;
+  roomData = null;
+  currentRoomCode = null;
+  resolvingRound = false;
+  showScreen("homeScreen");
+  hideMessage("homeMessage");
+}
+
+async function copyRoomCode() {
+  if (!currentRoomCode) return;
+
+  try {
+    await navigator.clipboard.writeText(currentRoomCode);
+    showMessage("lobbyMessage", "Room code copied: " + currentRoomCode, "success");
+  } catch (error) {
+    showMessage("lobbyMessage", "Your room code is " + currentRoomCode + ". Copy it manually.", "success");
+  }
+}
+
+function setupYearOptions() {
+  const select = $("movieStartYear");
+  const currentYear = new Date().getFullYear();
+
+  for (let year = currentYear; year >= 1980; year--) {
+    const option = document.createElement("option");
+    option.value = year;
+    option.textContent = year;
+    if (year === 2000) option.selected = true;
+    select.appendChild(option);
+  }
+}
+
+function initializeFirebase() {
+  if (!isConfigured()) {
+    setConnection("Setup required");
+    showMessage(
+      "homeMessage",
+      "Before playing, replace the Firebase and TMDB placeholders in the code with your own API settings."
+    );
+    return;
+  }
+
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.database();
+
+    auth.signInAnonymously().catch(error => {
+      setConnection("Firebase sign-in error");
+      showMessage(
+        "homeMessage",
+        "Enable Anonymous sign-in in Firebase Authentication. " + error.message,
+        "error"
+      );
+    });
+
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+
+      if (user) {
+        setConnection("Connected", true);
+      } else {
+        setConnection("Connecting…");
+      }
+    });
+  } catch (error) {
+    setConnection("Setup error");
+    showMessage("homeMessage", error.message, "error");
+  }
+}
+
+$("createBtn").addEventListener("click", createRoom);
+$("joinBtn").addEventListener("click", joinRoom);
+$("startBtn").addEventListener("click", startGame);
+$("bidForm").addEventListener("submit", submitBid);
+$("passBtn").addEventListener("click", passRound);
+$("copyBtn").addEventListener("click", copyRoomCode);
+$("leaveBtn").addEventListener("click", leaveRoom);
+$("leaveBtnFinal").addEventListener("click", leaveRoom);
+$("playAgainBtn").addEventListener("click", playAgain);
+
+$("selectionMode").addEventListener("change", () => {
+  const manual = $("selectionMode").value === "manual";
+  $("personTypeWrap").classList.toggle("hidden", !manual);
+  $("personNameWrap").classList.toggle("hidden", !manual);
+});
+
+$("roomInput").addEventListener("input", () => {
+  $("roomInput").value = $("roomInput").value.toUpperCase();
+});
+
+$("passBtn").addEventListener("click", () => {
+  setTimeout(() => {
+    if (roomData && isHost()) maybeAutoResolve();
+  }, 300);
+});
+
+if (typeof firebase !== "undefined") {
+  setupYearOptions();
+  initializeFirebase();
+
+  setInterval(() => {
+    if (roomData && isHost() && roomData.status === "playing") {
+      maybeAutoResolve();
+    }
+  }, 2500);
+}
+</script>
+</body>
+</html>
