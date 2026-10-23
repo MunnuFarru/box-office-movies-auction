@@ -847,6 +847,7 @@ function renderLeaderboard() {
   `).join("");
 }
 
+
 async function submitBid(event) {
   event.preventDefault();
 
@@ -885,6 +886,7 @@ async function submitBid(event) {
     }
 
     const latestPlayer = latest.players[currentUser.uid];
+
     if (!latestPlayer || latestPlayer.passed) {
       throw new Error("You can no longer bid in this round.");
     }
@@ -897,16 +899,26 @@ async function submitBid(event) {
       throw new Error("Your bid exceeds your remaining budget.");
     }
 
-    await roomRef.update({
-      highestBid: amount,
-      highestBidUid: currentUser.uid,
-      ["players/" + currentUser.uid + "/bid"]: amount
-    });
+    const updates = {};
+    updates["highestBid"] = amount;
+    updates["highestBidUid"] = currentUser.uid;
+    updates["players/" + currentUser.uid + "/bid"] = amount;
+
+    await roomRef.update(updates);
 
     $("bidAmount").value = "";
-    showMessage("gameMessage", "Your bid of " + money(amount) + " has been placed.", "success");
+
+    showMessage(
+      "gameMessage",
+      "Your bid of " + money(amount) + " has been placed.",
+      "success"
+    );
   } catch (error) {
-    showMessage("gameMessage", error.message || "Could not place bid.", "error");
+    showMessage(
+      "gameMessage",
+      error.message || "Could not place bid.",
+      "error"
+    );
   }
 }
 
