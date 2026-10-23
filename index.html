@@ -145,13 +145,13 @@ footer{text-align:center;color:#8f849f;font-size:.8rem;padding:12px}
 <div id="movieBadges"></div>
 <div class="sep"></div>
 <h2 id="highBidInfo">No bids yet — be the first!</h2>
-<p class="small">Use a whole-number bid higher than the current highest bid. You cannot bid more than your remaining budget.</p>
+<p class="small">Bid from ₹1 Cr to ₹100 Cr. Your bid must be higher than the current highest bid and within your remaining budget.</p>
 </div>
 </div>
 <form id="bidForm">
 <div class="grid">
-<div><label for="bidAmount">Your bid (₹)</label><input id="bidAmount" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 1L, 25M, 1B"><p id="bidHelp" class="small">L = lakh • M = million • B = billion</p></div>
-<div class="actions" style="align-items:end;margin-top:0"><button id="bidBtn" class="primary full" type="submit">Place / raise bid</button><button id="quickBidBtn" class="secondary" type="button" title="Place a bid exactly ₹1 above the current highest bid">+1</button></div>
+<div><label for="bidAmount">Your bid</label><div style="display:flex;align-items:stretch;gap:0"><input id="bidAmount" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter 1–100" aria-describedby="bidHelp" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:0;flex:1"><span aria-hidden="true" style="display:flex;align-items:center;padding:0 16px;border:1px solid var(--line);border-left:0;border-radius:0 12px 12px 0;background:var(--panel);font-weight:800">Cr</span></div><p id="bidHelp" class="small">Enter a whole number from 1 to 100. Cr is added automatically.</p></div>
+<div class="actions" style="align-items:end;margin-top:0"><button id="bidBtn" class="primary full" type="submit">Place / raise bid</button><button id="quickBidBtn" class="secondary" type="button" title="Raise the current highest bid by ₹1 Cr">+1 Cr</button></div>
 </div>
 </form>
 <div class="actions"><button id="passBtn" class="pinkbtn full">Pass this movie</button></div><p id="passHelp" class="small">Pass once to leave this movie's auction.</p>
@@ -268,8 +268,17 @@ function money(value) {
   if (abs >= 100000) return "₹" + (n / 100000).toLocaleString("en-IN", {maximumFractionDigits: 2}) + "L";
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
-function moneyInputHelp() {
-  return "Enter a whole amount or shorthand such as 1L, 25M, or 1B. L = 100,000; M = 1,000,000; B = 1,000,000,000.";
+const RUPEES_PER_CRORE = 10000000;
+const MAX_BID_CRORE = 100;
+function parseBidCrore(value) {
+  const raw = String(value ?? "").trim().toUpperCase().replace(/₹/g, "").replace(/\s+/g, "").replace(/CR(?:ORE)?S?$/, "");
+  if (!/^\d+$/.test(raw)) return NaN;
+  const crore = Number(raw);
+  return Number.isSafeInteger(crore) && crore >= 1 && crore <= MAX_BID_CRORE ? crore : NaN;
+}
+function bidMoney(rupees) {
+  const crore = Number(rupees || 0) / RUPEES_PER_CRORE;
+  return "₹" + crore.toLocaleString("en-IN", {maximumFractionDigits: 2}) + " Cr";
 }
 function randomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -566,7 +575,7 @@ function renderGame() {
   $("myScore").textContent = me && me.movies ? me.movies.length : 0;
   const bid = currentBid();
   if (me && me.passed) $("bidStatus").textContent = "Passed";
-  else if (bid.uid === currentUser.uid && Number(bid.amount) > 0) $("bidStatus").textContent = "Highest: " + money(bid.amount);
+  else if (bid.uid === currentUser.uid && Number(bid.amount) > 0) $("bidStatus").textContent = "Highest: " + bidMoney(bid.amount);
   else if (Number(bid.amount) > 0) $("bidStatus").textContent = "Outbid";
   else $("bidStatus").textContent = "Waiting";
   const movie = roomData.currentMovie;
@@ -583,8 +592,8 @@ function renderGame() {
   }
   const highest = Number(bid.amount || 0);
   const highBidder = bid.uid ? roomData.players[bid.uid] : null;
-  $("highBidInfo").textContent = highest > 0 && highBidder ? "Highest bid: " + money(highest) + " — " + highBidder.name : "No bids yet — be the first!";
-  $("bidHelp").textContent = moneyInputHelp();
+  $("highBidInfo").textContent = highest > 0 && highBidder ? "Highest bid: " + bidMoney(highest) + " — " + highBidder.name : "No bids yet — be the first!";
+  $("bidHelp").textContent = "Enter a whole number from 1 to 100. Cr is added automatically.";
   const canBid = roomData.status === "playing" && me && !me.passed && !!movie;
   $("bidAmount").disabled = !canBid;
   $("bidBtn").disabled = !canBid;
@@ -594,14 +603,14 @@ function renderGame() {
   else $("passHelp").textContent = "Pass once to leave this movie's auction.";
   $("gamePlayers").innerHTML = playerList().map(p => {
     const isHighest = p.uid === bid.uid && Number(bid.amount) > 0;
-    const status = p.passed ? "Passed this movie" : isHighest ? "Highest bidder • " + money(bid.amount) : Number(bid.amount) > 0 && p.uid === bid.uid ? "Highest bidder" : "Still in auction";
+    const status = p.passed ? "Passed this movie" : isHighest ? "Highest bidder • " + bidMoney(bid.amount) : Number(bid.amount) > 0 && p.uid === bid.uid ? "Highest bidder" : "Still in auction";
     return `<div class="player"><div><strong>Player ${Number(p.seat || 0)}: ${escapeHTML(p.name)}${p.uid === currentUser.uid ? " (You)" : ""}</strong><small>${escapeHTML(status)}</small></div><div class="player-right"><strong>${money(p.budget)}</strong><small>${(p.movies || []).length} movies</small></div></div>`;
   }).join("");
   const result = roomData.roundResult;
   $("resultCard").classList.toggle("hidden", !result);
   if (result) {
     $("roundResult").textContent = result.winnerName ? result.winnerName + " won the movie!" : "No winner this round";
-    $("resultReason").textContent = result.winnerName ? result.movieTitle + " was sold for " + money(result.amount) + "." : result.movieTitle + " received no valid bids.";
+    $("resultReason").textContent = result.winnerName ? result.movieTitle + " was sold for " + bidMoney(result.amount) + "." : result.movieTitle + " received no valid bids.";
     $("nextRoundMessage").textContent = roomData.status === "finished" ? "All rounds are complete. Choose a winner method below." : "The next round starts automatically.";
     const key = String(result.timestamp || "") + ":" + String(result.winnerUid || "none");
     if (key && key !== lastResultSoundKey) { lastResultSoundKey = key; if (result.winnerUid) playSound("win"); }
@@ -695,12 +704,13 @@ async function submitBid(event) {
   if (event) event.preventDefault();
   if (!roomRef || !roomData || roomData.status !== "playing") return;
   const me = currentPlayer();
-  const amount = parseAmount($("bidAmount").value);
+  const amountCrore = parseBidCrore($("bidAmount").value);
+  const amount = amountCrore * RUPEES_PER_CRORE;
   const bid = currentBid();
   const highest = Number(bid.amount || 0);
   if (!me || me.passed) { showMessage("gameMessage", "You have already passed this movie.", "error"); playSound("error"); return; }
-  if (!Number.isSafeInteger(amount) || amount < 1) { showMessage("gameMessage", "Enter a valid bid, such as 1L, 25M, or 1B.", "error"); playSound("error"); return; }
-  if (amount <= highest) { showMessage("gameMessage", "Your bid must be higher than " + money(highest) + ".", "error"); playSound("error"); return; }
+  if (!Number.isSafeInteger(amountCrore) || amountCrore < 1 || amountCrore > MAX_BID_CRORE) { showMessage("gameMessage", "Enter a whole-number bid from 1 to 100 Cr.", "error"); playSound("error"); return; }
+  if (amount <= highest) { showMessage("gameMessage", "Your bid must be higher than " + bidMoney(highest) + ".", "error"); playSound("error"); return; }
   if (amount > Number(me.budget)) { showMessage("gameMessage", "Your bid is higher than your remaining budget (" + money(me.budget) + ").", "error"); playSound("error"); return; }
   try {
     const latestSnap = await roomRef.get();
@@ -716,12 +726,14 @@ async function submitBid(event) {
     }, undefined, false);
     if (!result.committed) throw new Error("Someone placed a higher bid first. Enter a higher amount and try again.");
     $("bidAmount").value = "";
-    showMessage("gameMessage", "Your bid of " + money(amount) + " has been placed.", "success");
+    showMessage("gameMessage", "Your bid of " + bidMoney(amount) + " has been placed.", "success");
+    playSound("bid");
   } catch (error) { showMessage("gameMessage", error.message || "Could not place bid.", "error"); playSound("error"); }
 }
 async function quickBid() {
   const bid = currentBid();
-  const next = Number(bid.amount || 0) + 1;
+  const next = Math.floor(Number(bid.amount || 0) / RUPEES_PER_CRORE) + 1;
+  if (next > MAX_BID_CRORE) { showMessage("gameMessage", "The maximum bid is 100 Cr.", "error"); playSound("error"); return; }
   $("bidAmount").value = String(next);
   await submitBid(null);
 }
@@ -859,6 +871,7 @@ function playSound(kind) {
   if (soundMuted) return;
   if (kind === "error") { tone(220, 0, 0.16, "square", 0.045); tone(160, 0.16, 0.18, "square", 0.04); }
   else if (kind === "pass") { tone(540, 0, 0.12, "triangle", 0.05); tone(380, 0.12, 0.15, "triangle", 0.04); }
+  else if (kind === "bid") { tone(660, 0, 0.09, "sine", 0.055); tone(880, 0.08, 0.14, "sine", 0.06); }
   else if (kind === "win") { tone(523, 0, 0.18, "triangle", 0.06); tone(659, 0.15, 0.18, "triangle", 0.06); tone(784, 0.3, 0.32, "triangle", 0.07); }
 }
 function toggleSound() {
