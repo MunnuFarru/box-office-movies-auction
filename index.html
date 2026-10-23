@@ -516,21 +516,24 @@ async function createRoom() {
       snapshot = await ref.get();
     }
 
-    const initialRoom = {
-      code: code,
-      hostUid: currentUser.uid,
-      status: "lobby",
-      settings: settings,
-      createdAt: firebase.database.ServerValue.TIMESTAMP,
-      players: {},
-      queue: queue,
-      roundIndex: 0,
-      currentMovie: null,
-      highestBidUid: null,
-      highestBid: 0,
-      roundResult: null,
-      leaderboard: null
-    };
+    
+const initialRoom = {
+  code: code,
+  hostUid: currentUser.uid,
+  status: "lobby",
+  settings: settings,
+  startingBudget: budget,
+  createdAt: firebase.database.ServerValue.TIMESTAMP,
+  players: {},
+  queue: queue,
+  roundIndex: 0,
+  currentMovie: null,
+  highestBidUid: null,
+  highestBid: 0,
+  roundResult: null,
+  leaderboard: null
+};
+
 
     initialRoom.players[currentUser.uid] = makePlayer(name, budget);
 
