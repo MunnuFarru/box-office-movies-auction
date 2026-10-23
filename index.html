@@ -92,9 +92,9 @@ footer{text-align:center;color:#8f849f;font-size:.8rem;padding:12px}
 <div><label for="startingBudget">Starting budget (₹ Cr per player)</label><input id="startingBudget" type="text" value="100" placeholder="e.g. 100" autocomplete="off"><p class="small">Enter a whole number of crores. For example, 100 means ₹100 Cr per player.</p></div>
 <div><label for="movieCount">Number of movies</label><select id="movieCount"><option>5</option><option selected>7</option><option>10</option><option>15</option></select></div>
 <div><label for="movieStartYear">Movies released from year</label><select id="movieStartYear"></select></div>
-<div><label for="selectionMode">Movie selection</label><select id="selectionMode"><option value="popular">Popular Telugu movies</option><option value="manual">Filter by person</option></select></div>
+<div><label for="selectionMode">Movie selection</label><select id="selectionMode"><option value="popular">Popular Telugu movies</option><option value="manual">Search by hero / heroine / director</option><option value="title">Search by movie title</option></select></div>
 <div id="personTypeWrap" class="hidden"><label for="personType">Person type</label><select id="personType"><option value="hero">Hero / actor</option><option value="heroine">Heroine / actress</option><option value="director">Director</option></select></div>
-<div id="personNameWrap" class="hidden"><label for="personName">Person name</label><input id="personName" placeholder="e.g. Mahesh Babu"></div>
+<div id="personNameWrap" class="hidden"><label id="personNameLabel" for="personName">Name</label><input id="personName" placeholder="e.g. Jr NTR"></div>
 </div>
 <div class="actions"><button id="createBtn" class="primary">Create a room</button></div>
 <div id="homeMessage" class="notice hidden" role="status"></div>
@@ -148,6 +148,7 @@ footer{text-align:center;color:#8f849f;font-size:.8rem;padding:12px}
 <p class="small">Bid from ₹1 Cr to ₹100 Cr. Your bid must be higher than the current highest bid and within your remaining budget.</p>
 </div>
 </div>
+<div id="visitorNotice" class="notice hidden" role="status"><strong>Visitor mode</strong> — you can watch the game, and your budget and movie collection are preserved. Click below to rejoin the auction if the game is still active.<div class="actions"><button id="rejoinPlayerBtn" class="primary" type="button">Rejoin as player</button></div></div>
 <form id="bidForm">
 <div class="grid">
 <div><label for="bidAmount">Your bid</label><div style="display:flex;align-items:stretch;gap:0"><input id="bidAmount" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter 1–100" aria-describedby="bidHelp" style="border-top-right-radius:0;border-bottom-right-radius:0;min-width:0;flex:1"><span aria-hidden="true" style="display:flex;align-items:center;padding:0 16px;border:1px solid var(--line);border-left:0;border-radius:0 12px 12px 0;background:var(--panel);font-weight:800">Cr</span></div><p id="bidHelp" class="small">Enter a whole number from 1 to 100. Cr is added automatically.</p></div>
@@ -205,6 +206,10 @@ const TMDB_API_KEY = "4fe6efa604f929bf22f01075106b0a20";
 const MAX_PLAYERS = 8;
 const USD_TO_INR_ESTIMATE = 85; // Approximation used only for comparing TMDB's reported revenue with ₹ bids.
 const CLEANUP_DELAY_MS = 5 * 60 * 1000;
+const ACTIVE_ROOM_STORAGE_KEY = "teluguBoxOfficeActiveRoom";
+const PLAYER_NAME_STORAGE_KEY = "teluguBoxOfficePlayerName";
+const VISITOR_TIMEOUT_MS = 2 * 60 * 1000;
+const PRESENCE_WRITE_INTERVAL_MS = 15000;
 
 let auth = null;
 let db = null;
@@ -221,6 +226,10 @@ let roomWasDeleted = false;
 const cleanupScheduledCodes = new Set();
 let audioContext = null;
 let soundMuted = false;
+let presenceRef = null;
+let presenceDisconnect = null;
+let lastPresenceWriteAt = 0;
+let lastRestoredUid = "";
 
 const $ = id => document.getElementById(id);
 
@@ -295,18 +304,21 @@ async function api(path) {
 }
 async function fetchTeluguMovies() {
   const year = Number($("movieStartYear").value) || 1980;
+  const endYear = new Date().getFullYear();
   const seen = new Set();
   const results = [];
-  for (let page = 1; page <= 5; page++) {
-    const data = await api("discover/movie?with_original_language=te&sort_by=popularity.desc&vote_count.gte=3&primary_release_date.gte=" + year + "-01-01&page=" + page);
+  // TMDB returns 20 movies per page. Read up to 12 pages (240 candidates),
+  // include lesser-rated entries, and constrain release dates to the selected year range.
+  for (let page = 1; page <= 12; page++) {
+    const data = await api("discover/movie?with_original_language=te&sort_by=popularity.desc&vote_count.gte=1&primary_release_date.gte=" + year + "-01-01&primary_release_date.lte=" + endYear + "-12-31&page=" + page);
     (data.results || []).forEach(movie => {
       if (!movie.id || seen.has(movie.id)) return;
       seen.add(movie.id);
       results.push(movie);
     });
-    if (results.length >= 100) break;
+    if (!data.results || !data.results.length || (data.total_pages && page >= data.total_pages)) break;
   }
-  if (!results.length) throw new Error("No Telugu movies found for this year. Try an earlier year.");
+  if (!results.length) throw new Error("No Telugu movies found for this year range. Try an earlier year.");
   return results;
 }
 async function getMovieDetails(movie) {
@@ -341,6 +353,8 @@ async function getMovieDetails(movie) {
 }
 async function prepareQueue() {
   const selection = $("selectionMode").value;
+  const startYear = Number($("movieStartYear").value) || 1980;
+  const endYear = new Date().getFullYear();
   let catalogue = await fetchTeluguMovies();
   if (selection === "manual") {
     const person = $("personName").value.trim();
@@ -353,13 +367,30 @@ async function prepareQueue() {
     const cast = credits.cast || [];
     const crew = credits.crew || [];
     const list = type === "director" ? crew.filter(item => item.job === "Director") : cast;
-    const allowed = new Set(list.filter(item => item.original_language === "te" || catalogue.some(m => m.id === item.id)).map(m => m.id));
-    catalogue = catalogue.filter(m => allowed.has(m.id));
-    if (!catalogue.length) throw new Error("No matching Telugu movies found for this person.");
+    // Do not limit a hero's filmography to the popularity pages above: use all Telugu-original credits.
+    const byId = new Map();
+    list.filter(item => item.original_language === "te" || catalogue.some(m => m.id === item.id)).forEach(item => {
+      const year = Number((item.release_date || "").slice(0, 4));
+      if (year && (year < startYear || year > endYear)) return;
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    });
+    catalogue = Array.from(byId.values());
+    if (!catalogue.length) throw new Error("No matching Telugu movies found for this person in the selected year range.");
+  } else if (selection === "title") {
+    const query = $("personName").value.trim();
+    if (!query) throw new Error("Enter a movie title to search.");
+    const found = await api("search/movie?query=" + encodeURIComponent(query) + "&include_adult=false&page=1");
+    const allowedIds = new Set(catalogue.map(movie => movie.id));
+    catalogue = (found.results || []).filter(item => {
+      const year = Number((item.release_date || "").slice(0, 4));
+      return (item.original_language === "te" || allowedIds.has(item.id)) && (!year || (year >= startYear && year <= endYear));
+    });
+    if (!catalogue.length) throw new Error("No matching Telugu movie found. Try another title or an earlier year.");
   }
   const wanted = Math.min(Math.max(Number($("movieCount").value) || 7, 1), 15);
+  // Shuffle the full available catalogue before selecting a pool for details, avoiding the first-page bias.
   catalogue.sort(() => Math.random() - 0.5);
-  const selected = catalogue.slice(0, Math.min(50, catalogue.length));
+  const selected = catalogue.slice(0, Math.min(60, catalogue.length));
   const details = await Promise.all(selected.slice(0, Math.max(wanted * 2, 20)).map(getMovieDetails));
   if (!details.length) throw new Error("Could not load movies. Please try again.");
   details.sort(() => Math.random() - 0.5);
@@ -371,7 +402,7 @@ function setConnection(text, online = false) {
 }
 function getPlayerName() { return $("playerName").value.trim().slice(0, 20); }
 function makePlayer(name, budget, seat) {
-  return { uid: currentUser.uid, name, seat: Number(seat || 1), budget: Number(budget), movies: [], score: 0, bid: 0, passed: false, moviesWon: 0, connected: true };
+  return { uid: currentUser.uid, name, seat: Number(seat || 1), budget: Number(budget), movies: [], score: 0, bid: 0, passed: false, moviesWon: 0, connected: true, visitor: false, lastActiveAt: Date.now() };
 }
 function stopRoomListener() {
   if (unsubscribeRoom) { unsubscribeRoom(); unsubscribeRoom = null; }
@@ -383,11 +414,94 @@ function saveFinishedSnapshot(code, data) {
 function loadFinishedSnapshot(code) {
   try { const value = sessionStorage.getItem(getFinishedCacheKey(code)); return value ? JSON.parse(value) : null; } catch (_) { return null; }
 }
+function setPlayerActive(force = false) {
+  if (!roomRef || !currentUser || !roomData || !roomData.players || !roomData.players[currentUser.uid]) return Promise.resolve();
+  const now = Date.now();
+  if (!force && now - lastPresenceWriteAt < PRESENCE_WRITE_INTERVAL_MS) return Promise.resolve();
+  lastPresenceWriteAt = now;
+  return roomRef.child("players/" + currentUser.uid).update({ connected: true, visitor: false, lastActiveAt: now })
+    .catch(error => console.warn("Presence update failed:", error));
+}
+function startPresence(code) {
+  if (!db || !currentUser) return;
+  const playerRef = db.ref("rooms/" + code + "/players/" + currentUser.uid);
+  playerRef.once("value").then(snapshot => {
+    if (!snapshot.exists() || currentRoomCode !== code) return;
+    presenceRef = playerRef;
+    presenceDisconnect = playerRef.onDisconnect();
+    return presenceDisconnect.update({ connected: false, lastSeenAt: firebase.database.ServerValue.TIMESTAMP }).then(() => {
+      const now = Date.now();
+      lastPresenceWriteAt = now;
+      return playerRef.update({ connected: true, visitor: false, lastActiveAt: now });
+    });
+  }).catch(error => console.warn("Could not restore player presence:", error));
+}
+async function maybeApplyVisitorMode() {
+  if (!roomRef || !roomData || roomData.status !== "playing") return;
+  if (!isHost()) {
+    const me = currentPlayer();
+    const lastActive = Number(me && me.lastActiveAt || 0);
+    if (me && !me.visitor && lastActive > 0 && Date.now() - lastActive >= VISITOR_TIMEOUT_MS) {
+      try { await roomRef.child("players/" + currentUser.uid + "/visitor").set(true); } catch (error) { console.warn("Could not enter visitor mode:", error); }
+    }
+    return;
+  }
+  const now = Date.now();
+  const updates = {};
+  Object.entries(roomData.players || {}).forEach(([uid, player]) => {
+    const lastActive = Number(player.lastActiveAt || 0);
+    if (!player.visitor && lastActive > 0 && now - lastActive >= VISITOR_TIMEOUT_MS) {
+      updates["players/" + uid + "/visitor"] = true;
+    }
+    // Also clear an inactive highest bid if that player manually left the game.
+    if ((player.visitor || (lastActive > 0 && now - lastActive >= VISITOR_TIMEOUT_MS)) && roomData.currentBid && roomData.currentBid.uid === uid) {
+      updates.currentBid = { amount: 0, uid: null, timestamp: 0 };
+      updates.highestBid = 0;
+      updates.highestBidUid = null;
+    }
+  });
+  if (Object.keys(updates).length) {
+    try { await roomRef.update(updates); } catch (error) { console.warn("Could not apply visitor mode:", error); }
+  }
+}
+async function restoreSavedRoom(uid) {
+  if (!uid || !db || lastRestoredUid === uid) return;
+  lastRestoredUid = uid;
+  let code = "";
+  try {
+    code = (localStorage.getItem(ACTIVE_ROOM_STORAGE_KEY) || "").trim().toUpperCase();
+    const savedName = localStorage.getItem(PLAYER_NAME_STORAGE_KEY) || "";
+    if (!$ ("playerName").value.trim() && savedName) $("playerName").value = savedName;
+  } catch (_) {}
+  if (!/^[A-Z0-9]{6}$/.test(code)) return;
+  try {
+    const snapshot = await db.ref("rooms/" + code).get();
+    if (!snapshot.exists()) {
+      try { localStorage.removeItem(ACTIVE_ROOM_STORAGE_KEY); } catch (_) {}
+      return;
+    }
+    const room = snapshot.val();
+    if ((room.players || {})[uid]) {
+      listenRoom(code);
+      setPlayerActive(true);
+      showMessage(room.status === "lobby" ? "lobbyMessage" : "gameMessage", "Welcome back! Your previous game has been restored.", "success");
+    } else if (room.status === "finished") {
+      listenRoom(code);
+    } else {
+      try { localStorage.removeItem(ACTIVE_ROOM_STORAGE_KEY); } catch (_) {}
+    }
+  } catch (error) { console.warn("Could not restore previous room:", error); }
+}
 function listenRoom(code) {
   stopRoomListener();
   currentRoomCode = code;
+  try {
+    localStorage.setItem(ACTIVE_ROOM_STORAGE_KEY, code);
+    if (getPlayerName()) localStorage.setItem(PLAYER_NAME_STORAGE_KEY, getPlayerName());
+  } catch (_) {}
   roomWasDeleted = false;
   roomRef = db.ref("rooms/" + code);
+  startPresence(code);
   const watchedRef = roomRef;
   const callback = snapshot => {
     if (!snapshot.exists()) {
@@ -486,9 +600,15 @@ async function joinRoom() {
     const snapshot = await ref.get();
     if (!snapshot.exists()) throw new Error("Room not found. Check the code.");
     const room = snapshot.val();
-    if (room.status !== "lobby") throw new Error("This game has already started.");
     const players = room.players || {};
-    if (players[currentUser.uid]) { listenRoom(code); return; }
+    // A returning player can rejoin an active game using the same Firebase identity.
+    if (players[currentUser.uid]) {
+      listenRoom(code);
+      setPlayerActive(true);
+      showMessage(room.status === "lobby" ? "lobbyMessage" : "gameMessage", "Welcome back! You rejoined the existing game.", "success");
+      return;
+    }
+    if (room.status !== "lobby") throw new Error("This game has already started. Only players who joined before the game began can rejoin as players.");
     if (Object.keys(players).length >= MAX_PLAYERS) throw new Error("This room is full. Maximum 8 players.");
     const seat = allocateSeat(players);
     if (!seat) throw new Error("All 8 player seats are full.");
@@ -509,7 +629,7 @@ function playerList() {
 }
 function isHost() { return !!roomData && !!currentUser && roomData.hostUid === currentUser.uid; }
 function currentPlayer() { return roomData && roomData.players ? roomData.players[currentUser.uid] : null; }
-function activePlayers() { return playerList().filter(p => !p.passed); }
+function activePlayers() { return playerList().filter(p => !p.passed && !p.visitor); }
 function currentBid() { return roomData && roomData.currentBid ? roomData.currentBid : { amount: Number(roomData && roomData.highestBid || 0), uid: roomData && roomData.highestBidUid || null }; }
 function renderLobby() {
   if (!roomData) return;
@@ -585,7 +705,9 @@ function renderGame() {
   const highBidder = bid.uid ? roomData.players[bid.uid] : null;
   $("highBidInfo").textContent = highest > 0 && highBidder ? "Highest bid: " + bidMoney(highest) + " — " + highBidder.name : "No bids yet — be the first!";
   $("bidHelp").textContent = "Enter a whole number from 1 to 100. Cr is added automatically.";
-  const canBid = roomData.status === "playing" && me && !me.passed && !!movie;
+  const isVisitor = !!(me && me.visitor);
+  $("visitorNotice").classList.toggle("hidden", !isVisitor || roomData.status !== "playing");
+  const canBid = roomData.status === "playing" && me && !me.passed && !isVisitor && !!movie;
   $("bidAmount").disabled = !canBid;
   $("bidBtn").disabled = !canBid;
   $("quickBidBtn").disabled = !canBid;
@@ -594,7 +716,7 @@ function renderGame() {
   else $("passHelp").textContent = "Pass once to leave this movie's auction.";
   $("gamePlayers").innerHTML = playerList().map(p => {
     const isHighest = p.uid === bid.uid && Number(bid.amount) > 0;
-    const status = p.passed ? "Passed this movie" : isHighest ? "Highest bidder • " + bidMoney(bid.amount) : Number(bid.amount) > 0 && p.uid === bid.uid ? "Highest bidder" : "Still in auction";
+    const status = p.visitor ? "Visitor mode" : p.passed ? "Passed this movie" : isHighest ? "Highest bidder • " + bidMoney(bid.amount) : Number(bid.amount) > 0 && p.uid === bid.uid ? "Highest bidder" : "Still in auction";
     return `<div class="player"><div><strong>Player ${Number(p.seat || 0)}: ${escapeHTML(p.name)}${p.uid === currentUser.uid ? " (You)" : ""}</strong><small>${escapeHTML(status)}</small></div><div class="player-right"><strong>${money(p.budget)}</strong><small>${(p.movies || []).length} movies</small></div></div>`;
   }).join("");
   const result = roomData.roundResult;
@@ -699,7 +821,7 @@ async function submitBid(event) {
   const amount = amountCrore * RUPEES_PER_CRORE;
   const bid = currentBid();
   const highest = Number(bid.amount || 0);
-  if (!me || me.passed) { showMessage("gameMessage", "You have already passed this movie.", "error"); playSound("error"); return; }
+  if (!me || me.passed || me.visitor) { showMessage("gameMessage", me && me.visitor ? "You are in visitor mode. Interact with the page to rejoin first." : "You have already passed this movie.", "error"); playSound("error"); return; }
   if (!Number.isSafeInteger(amountCrore) || amountCrore < 1 || amountCrore > MAX_BID_CRORE) { showMessage("gameMessage", "Enter a whole-number bid from 1 to 100 Cr.", "error"); playSound("error"); return; }
   if (amount <= highest) { showMessage("gameMessage", "Your bid must be higher than " + bidMoney(highest) + ".", "error"); playSound("error"); return; }
   if (amount > Number(me.budget)) { showMessage("gameMessage", "Your bid is higher than your remaining budget (" + money(me.budget) + ").", "error"); playSound("error"); return; }
@@ -732,7 +854,7 @@ async function passRound() {
   if (!roomRef || !roomData || roomData.status !== "playing") return;
   const me = currentPlayer();
   const bid = currentBid();
-  if (!me || me.passed) return;
+  if (!me || me.passed || me.visitor) return;
   if (bid.uid === currentUser.uid && Number(bid.amount) > 0) { showMessage("gameMessage", "You are the highest bidder and cannot withdraw your bid.", "error"); playSound("error"); return; }
   try {
     await roomRef.child("players/" + currentUser.uid + "/passed").set(true);
@@ -768,7 +890,7 @@ async function resolveRound() {
     let winner = null;
     if (amount > 0 && bid.uid && players[bid.uid]) {
       const candidate = players[bid.uid];
-      if (!candidate.passed && amount <= Number(candidate.budget)) winner = candidate;
+      if (!candidate.passed && !candidate.visitor && amount <= Number(candidate.budget)) winner = candidate;
     }
     const result = { movieId: movie.id || null, movieTitle: movie.title || "Unknown movie", winnerUid: winner ? winner.uid : null, winnerName: winner ? winner.name : null, amount: winner ? amount : 0, timestamp: Date.now() };
     const updates = { status: "resolving", roundResult: result, resolvedAt: Date.now(), highestBid: winner ? amount : 0, highestBidUid: winner ? winner.uid : null };
@@ -825,7 +947,14 @@ async function playAgain() {
   } catch (error) { showMessage("gameMessage", error.message || "Could not create a fresh game.", "error"); playSound("error"); }
 }
 async function leaveRoom() {
-  stopRoomListener(); roomRef = null; roomData = null; currentRoomCode = null; resolvingRound = false; advancingRound = false; roomWasDeleted = false;
+  const oldRef = roomRef;
+  const oldCode = currentRoomCode;
+  if (oldRef && roomData && roomData.status === "playing" && currentUser && roomData.players && roomData.players[currentUser.uid]) {
+    try { await oldRef.child("players/" + currentUser.uid + "/visitor").set(true); } catch (_) {}
+  }
+  try { if (presenceDisconnect) await presenceDisconnect.cancel(); } catch (_) {}
+  stopRoomListener(); roomRef = null; roomData = null; currentRoomCode = null; resolvingRound = false; advancingRound = false; roomWasDeleted = false; presenceRef = null; presenceDisconnect = null;
+  try { localStorage.removeItem(ACTIVE_ROOM_STORAGE_KEY); } catch (_) {}
   showScreen("homeScreen"); hideMessage("homeMessage");
   $("playAgainBtn").textContent = "Create a fresh room";
 }
@@ -836,7 +965,7 @@ async function copyRoomCode() {
 }
 function setupYearOptions() {
   const select = $("movieStartYear"); const currentYear = new Date().getFullYear();
-  for (let year = currentYear; year >= 1980; year--) { const option = document.createElement("option"); option.value = year; option.textContent = year; if (year === 2000) option.selected = true; select.appendChild(option); }
+  for (let year = currentYear; year >= 1980; year--) { const option = document.createElement("option"); option.value = year; option.textContent = year; if (year === 1980) option.selected = true; select.appendChild(option); }
 }
 function ensureAudio() {
   if (soundMuted) return null;
@@ -875,8 +1004,14 @@ function initializeFirebase() {
   if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "PASTE_YOUR_FIREBASE_API_KEY_HERE") { setConnection("Setup required"); return; }
   try {
     firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.database();
-    auth.signInAnonymously().catch(error => { setConnection("Sign-in error"); showMessage("homeMessage", "Enable Anonymous sign-in in Firebase Authentication. " + error.message, "error"); });
-    auth.onAuthStateChanged(user => { currentUser = user; setConnection(user ? "Connected" : "Connecting…", !!user); });
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      setConnection(user ? "Connected" : "Connecting…", !!user);
+      if (user) restoreSavedRoom(user.uid);
+    });
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .then(() => auth.signInAnonymously())
+      .catch(error => { setConnection("Sign-in error"); showMessage("homeMessage", "Enable Anonymous sign-in in Firebase Authentication. " + error.message, "error"); });
   } catch (error) { setConnection("Setup error"); showMessage("homeMessage", error.message, "error"); }
 }
 
@@ -886,21 +1021,39 @@ $("startBtn").addEventListener("click", startGame);
 $("bidForm").addEventListener("submit", submitBid);
 $("quickBidBtn").addEventListener("click", quickBid);
 $("passBtn").addEventListener("click", passRound);
+$("rejoinPlayerBtn").addEventListener("click", async () => {
+  await setPlayerActive(true);
+  showMessage("gameMessage", "Rejoining as a player…", "success");
+});
 $("copyBtn").addEventListener("click", copyRoomCode);
 $("leaveBtn").addEventListener("click", leaveRoom);
 $("leaveBtnFinal").addEventListener("click", leaveRoom);
 $("playAgainBtn").addEventListener("click", playAgain);
 $("winnerMethod").addEventListener("change", chooseWinnerMethod);
 $("soundToggleBtn").addEventListener("click", toggleSound);
-$("selectionMode").addEventListener("change", () => {
-  const manual = $("selectionMode").value === "manual";
+function updateSelectionFields() {
+  const selection = $("selectionMode").value;
+  const manual = selection === "manual";
+  const title = selection === "title";
   $("personTypeWrap").classList.toggle("hidden", !manual);
-  $("personNameWrap").classList.toggle("hidden", !manual);
-});
+  $("personNameWrap").classList.toggle("hidden", !manual && !title);
+  $("personNameLabel").textContent = title ? "Movie title" : "Hero / heroine / director name";
+  $("personName").placeholder = title ? "e.g. RRR" : "e.g. Jr NTR";
+}
+$("selectionMode").addEventListener("change", updateSelectionFields);
+updateSelectionFields();
 $("roomInput").addEventListener("input", () => { $("roomInput").value = $("roomInput").value.toUpperCase(); });
 setupYearOptions();
 initializeFirebase();
-setInterval(() => { if (roomData && isHost()) maybeAutoResolve(); }, 1000);
+["pointerdown", "keydown", "touchstart", "mousemove", "focus"].forEach(eventName => {
+  document.addEventListener(eventName, () => setPlayerActive(false), { passive: true });
+});
+setInterval(() => {
+  if (roomData) {
+    maybeApplyVisitorMode();
+    if (isHost()) maybeAutoResolve();
+  }
+}, 1000);
 </script>
 
 </body>
