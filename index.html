@@ -89,7 +89,7 @@ footer{text-align:center;color:#8f849f;font-size:.8rem;padding:12px}
 <h2>Set up your game</h2>
 <div class="grid">
 <div><label for="playerName">Your player name</label><input id="playerName" maxlength="20" placeholder="Enter your name"></div>
-<div><label for="startingBudget">Starting budget (₹)</label><input id="startingBudget" type="text" value="99B" placeholder="e.g. 10M or 1B" autocomplete="off"><p class="small">Use a number or shorthand: L = lakh, M = million, B = billion.</p></div>
+<div><label for="startingBudget">Starting budget (₹ Cr per player)</label><input id="startingBudget" type="text" value="100" placeholder="e.g. 100" autocomplete="off"><p class="small">Enter a whole number of crores. For example, 100 means ₹100 Cr per player.</p></div>
 <div><label for="movieCount">Number of movies</label><select id="movieCount"><option>5</option><option selected>7</option><option>10</option><option>15</option></select></div>
 <div><label for="movieStartYear">Movies released from year</label><select id="movieStartYear"></select></div>
 <div><label for="selectionMode">Movie selection</label><select id="selectionMode"><option value="popular">Popular Telugu movies</option><option value="manual">Filter by person</option></select></div>
@@ -246,27 +246,18 @@ function escapeHTML(value) {
   })[ch]);
 }
 function parseAmount(value) {
-  if (typeof value === "number") return Number.isSafeInteger(value) && value >= 0 ? value : NaN;
-  const raw = String(value ?? "").trim().replace(/[₹,\s]/g, "").toUpperCase();
-  if (!raw) return NaN;
-  const match = raw.match(/^([0-9]+(?:\.[0-9]+)?)(L|LAKH|LAKHS|M|MN|MILLION|MILLIONS|B|BN|BILLION|BILLIONS)?$/);
-  if (!match) return NaN;
-  const n = Number(match[1]);
-  const suffix = match[2] || "";
-  const multiplier = ["L", "LAKH", "LAKHS"].includes(suffix) ? 100000
-    : ["M", "MN", "MILLION", "MILLIONS"].includes(suffix) ? 1000000
-    : ["B", "BN", "BILLION", "BILLIONS"].includes(suffix) ? 1000000000 : 1;
-  const amount = n * multiplier;
-  return Number.isSafeInteger(amount) && amount >= 0 ? amount : NaN;
+  const raw = String(value ?? "").trim().toUpperCase().replace(/[₹,\s]/g, "").replace(/CR(?:ORE)?S?$/, "");
+  if (!/^\d+$/.test(raw)) return NaN;
+  const crore = Number(raw);
+  if (!Number.isSafeInteger(crore) || crore < 1) return NaN;
+  const amount = crore * RUPEES_PER_CRORE;
+  return Number.isSafeInteger(amount) ? amount : NaN;
 }
 function money(value) {
   const n = Number(value || 0);
   if (!Number.isFinite(n)) return "₹—";
-  const abs = Math.abs(n);
-  if (abs >= 1000000000) return "₹" + (n / 1000000000).toLocaleString("en-IN", {maximumFractionDigits: 2}) + "B";
-  if (abs >= 1000000) return "₹" + (n / 1000000).toLocaleString("en-IN", {maximumFractionDigits: 2}) + "M";
-  if (abs >= 100000) return "₹" + (n / 100000).toLocaleString("en-IN", {maximumFractionDigits: 2}) + "L";
-  return "₹" + Math.round(n).toLocaleString("en-IN");
+  const crore = n / RUPEES_PER_CRORE;
+  return "₹" + crore.toLocaleString("en-IN", {maximumFractionDigits: 2}) + " Cr";
 }
 const RUPEES_PER_CRORE = 10000000;
 const MAX_BID_CRORE = 100;
@@ -452,7 +443,7 @@ async function createRoom() {
   const name = getPlayerName();
   const budget = parseAmount($("startingBudget").value);
   if (!name) { showMessage("homeMessage", "Please enter your player name.", "error"); return; }
-  if (!Number.isSafeInteger(budget) || budget < 1) { showMessage("homeMessage", "Enter a valid starting budget, such as 1000000, 10M, or 1B.", "error"); playSound("error"); return; }
+  if (!Number.isSafeInteger(budget) || budget < 1) { showMessage("homeMessage", "Enter a whole-number starting budget in crores, such as 100 for ₹100 Cr.", "error"); playSound("error"); return; }
   $("createBtn").disabled = true;
   $("createBtn").textContent = "Preparing game…";
   try {
